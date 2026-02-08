@@ -1,0 +1,1537 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Bookinfo - OpenShift Service Mesh 3 (Ambient Mode)</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+            line-height: 1.6;
+            color: #333;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+        }
+
+        .container {
+            max-width: 1200px;
+            margin: 0 auto;
+            padding: 20px;
+        }
+
+        header {
+            background: rgba(255, 255, 255, 0.95);
+            backdrop-filter: blur(10px);
+            border-radius: 15px;
+            padding: 40px;
+            margin-bottom: 30px;
+            box-shadow: 0 10px 40px rgba(0, 0, 0, 0.1);
+        }
+
+        h1 {
+            color: #667eea;
+            font-size: 2.5em;
+            margin-bottom: 10px;
+        }
+
+        .subtitle {
+            color: #666;
+            font-size: 1.2em;
+        }
+
+        .badge {
+            display: inline-block;
+            background: #667eea;
+            color: white;
+            padding: 5px 15px;
+            border-radius: 20px;
+            font-size: 0.9em;
+            margin: 10px 5px 0 0;
+        }
+
+        .content {
+            background: white;
+            border-radius: 15px;
+            padding: 40px;
+            margin-bottom: 30px;
+            box-shadow: 0 10px 40px rgba(0, 0, 0, 0.1);
+        }
+
+        h2 {
+            color: #667eea;
+            margin: 30px 0 20px 0;
+            padding-bottom: 10px;
+            border-bottom: 3px solid #667eea;
+        }
+
+        h3 {
+            color: #764ba2;
+            margin: 25px 0 15px 0;
+        }
+
+        h4 {
+            color: #555;
+            margin: 20px 0 10px 0;
+        }
+
+        .grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+            gap: 20px;
+            margin: 20px 0;
+        }
+
+        .card {
+            background: linear-gradient(135deg, #f5f7fa 0%, #c3cfe2 100%);
+            border-radius: 10px;
+            padding: 25px;
+            transition: transform 0.3s, box-shadow 0.3s;
+        }
+
+        .card:hover {
+            transform: translateY(-5px);
+            box-shadow: 0 15px 30px rgba(0, 0, 0, 0.2);
+        }
+
+        .card h3 {
+            color: #667eea;
+            margin-top: 0;
+        }
+
+        .code-container {
+            position: relative;
+            margin: 15px 0;
+        }
+
+        .code-block {
+            background: #1e1e1e;
+            color: #d4d4d4;
+            padding: 20px;
+            border-radius: 10px;
+            overflow-x: auto;
+            font-family: "Monaco", "Courier New", monospace;
+            font-size: 0.9em;
+            line-height: 1.5;
+            margin: 0;
+            white-space: pre-wrap;
+        }
+
+        .copy-btn {
+            position: absolute;
+            top: 10px;
+            right: 10px;
+            background: #667eea;
+            color: white;
+            border: none;
+            padding: 8px 15px;
+            border-radius: 5px;
+            cursor: pointer;
+            font-size: 0.8em;
+            transition: all 0.3s;
+            opacity: 0.8;
+        }
+
+        .copy-btn:hover {
+            opacity: 1;
+            background: #764ba2;
+        }
+
+        .copy-btn.copied {
+            background: #10b981;
+        }
+
+        .code-block .comment {
+            color: #6a9955;
+        }
+
+        .code-block .keyword {
+            color: #569cd6;
+        }
+
+        .code-block .string {
+            color: #ce9178;
+        }
+
+        .command {
+            background: #2d2d2d;
+            color: #f8f8f2;
+            padding: 3px 8px;
+            border-radius: 5px;
+            font-family: "Monaco", "Courier New", monospace;
+            font-size: 0.9em;
+        }
+
+        .success {
+            color: #10b981;
+            font-weight: bold;
+        }
+
+        .warning {
+            color: #f59e0b;
+            font-weight: bold;
+        }
+
+        .error {
+            color: #ef4444;
+            font-weight: bold;
+        }
+
+        ul, ol {
+            margin: 15px 0 15px 30px;
+        }
+
+        li {
+            margin: 8px 0;
+        }
+
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            margin: 20px 0;
+        }
+
+        th, td {
+            padding: 12px;
+            text-align: left;
+            border-bottom: 1px solid #ddd;
+        }
+
+        th {
+            background: #667eea;
+            color: white;
+            font-weight: 600;
+        }
+
+        tr:hover {
+            background: #f5f7fa;
+        }
+
+        .diagram {
+            background: #f8fafc;
+            border: 2px solid #667eea;
+            border-radius: 10px;
+            padding: 20px;
+            margin: 20px 0;
+            font-family: monospace;
+            white-space: pre;
+            overflow-x: auto;
+        }
+
+        .nav {
+            position: sticky;
+            top: 20px;
+            background: white;
+            border-radius: 10px;
+            padding: 20px;
+            box-shadow: 0 5px 20px rgba(0, 0, 0, 0.1);
+        }
+
+        .nav ul {
+            list-style: none;
+            margin: 0;
+        }
+
+        .nav li {
+            margin: 10px 0;
+        }
+
+        .nav a {
+            color: #667eea;
+            text-decoration: none;
+            transition: color 0.3s;
+        }
+
+        .nav a:hover {
+            color: #764ba2;
+            text-decoration: underline;
+        }
+
+        .feature-list {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 10px;
+            margin: 20px 0;
+        }
+
+        .feature-item {
+            background: #10b981;
+            color: white;
+            padding: 8px 16px;
+            border-radius: 20px;
+            font-size: 0.9em;
+        }
+
+        .layout {
+            display: grid;
+            grid-template-columns: 250px 1fr;
+            gap: 30px;
+        }
+
+        @media (max-width: 768px) {
+            .layout {
+                grid-template-columns: 1fr;
+            }
+
+            h1 {
+                font-size: 2em;
+            }
+        }
+
+        .proof-box {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            padding: 20px;
+            border-radius: 10px;
+            margin: 15px 0;
+        }
+
+        .proof-box h4 {
+            color: white;
+            margin-top: 0;
+        }
+
+        .highlight {
+            background: #fef3c7;
+            padding: 2px 5px;
+            border-radius: 3px;
+        }
+
+        footer {
+            text-align: center;
+            color: white;
+            padding: 20px;
+            margin-top: 30px;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <header>
+            <h1>🚀 Bookinfo sur OpenShift Service Mesh 3</h1>
+            <p class="subtitle">Déploiement en mode Ambient (sans sidecars)</p>
+            <div>
+                <span class="badge">Istio v1.26.4</span>
+                <span class="badge">OpenShift 4.12+</span>
+                <span class="badge">Ambient Mode</span>
+                <span class="badge">ZTunnel (L4)</span>
+                <span class="badge">Waypoint (L7)</span>
+                <span class="badge">Kiali</span>
+            </div>
+        </header>
+
+        <div class="layout">
+            <nav class="nav">
+                <h3>Navigation</h3>
+                <ul>
+                    <li><a href="#introduction">Introduction</a></li>
+                    <li><a href="#architecture">Architecture</a></li>
+                    <li><a href="#waypoint">Waypoint Proxy (L7)</a></li>
+                    <li><a href="#prerequisites">Prérequis</a></li>
+                    <li><a href="#installation">Installation</a></li>
+                    <li><a href="#verification">Vérification</a></li>
+                    <li><a href="#kiali">Kiali (Observabilité)</a></li>
+                    <li><a href="#traffic">Traffic Management</a></li>
+                    <li><a href="#preuves">Preuves Ambient</a></li>
+                    <li><a href="#redirection">Redirection Trafic</a></li>
+                    <li><a href="#cleanup">Nettoyage</a></li>
+                    <li><a href="#troubleshooting">Troubleshooting</a></li>
+                    <li><a href="#scripts">Scripts</a></li>
+                </ul>
+            </nav>
+
+            <main>
+                <div class="content" id="introduction">
+                    <h2>📖 Introduction</h2>
+
+                    <h3>Qu'est-ce que le mode Ambient ?</h3>
+                    <p>Le <strong>mode ambient</strong> d'Istio est une nouvelle architecture qui simplifie le service mesh en éliminant le besoin de sidecars.</p>
+
+                    <div class="feature-list">
+                        <span class="feature-item">✅ Pas de sidecars</span>
+                        <span class="feature-item">✅ ZTunnel (L4 proxy)</span>
+                        <span class="feature-item">✅ Moins de ressources</span>
+                        <span class="feature-item">✅ Déploiement simplifié</span>
+                        <span class="feature-item">✅ mTLS automatique</span>
+                        <span class="feature-item">✅ Pas de restart pods</span>
+                    </div>
+
+                    <h3>Avantages vs Mode Sidecar</h3>
+                    <table>
+                        <thead>
+                            <tr>
+                                <th>Critère</th>
+                                <th>Sidecar Mode</th>
+                                <th>Ambient Mode</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            <tr>
+                                <td><strong>Proxy</strong></td>
+                                <td>istio-proxy (dans le pod)</td>
+                                <td><span class="success">ZTunnel (sur le nœud)</span></td>
+                            </tr>
+                            <tr>
+                                <td><strong>Redirection</strong></td>
+                                <td>Init container</td>
+                                <td><span class="success">Istio CNI</span></td>
+                            </tr>
+                            <tr>
+                                <td><strong>Ressources</strong></td>
+                                <td>Par pod</td>
+                                <td><span class="success">Par nœud (partagé)</span></td>
+                            </tr>
+                            <tr>
+                                <td><strong>Injection</strong></td>
+                                <td>Webhook requis</td>
+                                <td><span class="success">Automatique (CNI)</span></td>
+                            </tr>
+                            <tr>
+                                <td><strong>Restart pods</strong></td>
+                                <td><span class="error">OUI</span></td>
+                                <td><span class="success">NON</span></td>
+                            </tr>
+                        </tbody>
+                    </table>
+                </div>
+
+                <div class="content" id="architecture">
+                    <h2>🏗️ Architecture</h2>
+
+                    <div class="diagram">
+┌─────────────────────────────────────────────────┐
+│           OpenShift Cluster                     │
+│                                                 │
+│  ┌───────────────────────────────────────────┐  │
+│  │  Namespace: istio-system                  │  │
+│  │  - istiod (Control Plane)                 │  │
+│  │  - bookinfo-gateway (Ingress)             │  │
+│  └───────────────────────────────────────────┘  │
+│                                                 │
+│  ┌───────────────────────────────────────────┐  │
+│  │  Namespace: ztunnel                       │  │
+│  │  - ztunnel (DaemonSet - Ambient proxy)    │  │
+│  └───────────────────────────────────────────┘  │
+│                                                 │
+│  ┌───────────────────────────────────────────┐  │
+│  │  Namespace: bookinfo (ambient mode)       │  │
+│  │                                           │  │
+│  │  ┌─────────────┐  ┌─────────────┐        │  │
+│  │  │productpage  │  │  details    │        │  │
+│  │  │  (v1)       │  │   (v1)      │        │  │
+│  │  └─────────────┘  └─────────────┘        │  │
+│  │                                           │  │
+│  │  ┌─────────────┐  ┌─────────────┐        │  │
+│  │  │  reviews    │  │  ratings    │        │  │
+│  │  │ (v1,v2,v3)  │  │   (v1)      │        │  │
+│  │  └─────────────┘  └─────────────┘        │  │
+│  └───────────────────────────────────────────┘  │
+│                                                 │
+│  Route OpenShift:                               │
+│  bookinfo-istio-system.apps.cluster.com        │
+└─────────────────────────────────────────────────┘
+                    </div>
+
+                    <h3>Architecture en 2 Couches</h3>
+                    <p>Le mode Ambient utilise une architecture progressive en deux couches :</p>
+
+                    <div class="grid">
+                        <div class="card" style="border-left: 4px solid #10b981;">
+                            <h3>🔵 Couche L4 - Secure Overlay (ZTunnel)</h3>
+                            <p><strong>Automatique et transparent</strong></p>
+                            <ul>
+                                <li>✅ mTLS entre tous les services</li>
+                                <li>✅ Métriques TCP de base</li>
+                                <li>✅ Connectivité sécurisée</li>
+                                <li>❌ Pas de routage avancé</li>
+                            </ul>
+                            <p><strong>Composant</strong> : ZTunnel (DaemonSet)</p>
+                        </div>
+
+                        <div class="card" style="border-left: 4px solid #667eea;">
+                            <h3>🟣 Couche L7 - Secure Application (Waypoint)</h3>
+                            <p><strong>Optionnel, activé si besoin</strong></p>
+                            <ul>
+                                <li>✅ VirtualServices (routage avancé)</li>
+                                <li>✅ DestinationRules (load balancing)</li>
+                                <li>✅ Traffic splitting (canary, A/B)</li>
+                                <li>✅ Fault injection, retries, timeouts</li>
+                            </ul>
+                            <p><strong>Composant</strong> : Waypoint Proxy (Deployment par namespace)</p>
+                        </div>
+                    </div>
+
+                    <h3>Composants Infrastructure</h3>
+                    <div class="grid">
+                        <div class="card">
+                            <h3>🎛️ istiod</h3>
+                            <p>Plan de contrôle Istio qui gère la configuration du mesh et distribue les certificats pour mTLS.</p>
+                        </div>
+                        <div class="card">
+                            <h3>🔌 Istio CNI</h3>
+                            <p>Plugin CNI qui configure la redirection réseau vers ZTunnel de manière transparente.</p>
+                        </div>
+                        <div class="card">
+                            <h3>🛡️ ZTunnel (L4)</h3>
+                            <p>Proxy L4 (DaemonSet) qui gère le trafic, mTLS et observabilité sans sidecar.</p>
+                        </div>
+                        <div class="card">
+                            <h3>⚡ Waypoint (L7)</h3>
+                            <p>Proxy L7 optionnel (Deployment) pour VirtualServices et routage avancé.</p>
+                        </div>
+                        <div class="card">
+                            <h3>🌐 Gateway</h3>
+                            <p>Point d'entrée pour le trafic externe utilisant Gateway API v1.</p>
+                        </div>
+                    </div>
+
+                    <h3>Services Bookinfo</h3>
+                    <table>
+                        <thead>
+                            <tr>
+                                <th>Service</th>
+                                <th>Version(s)</th>
+                                <th>Description</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            <tr>
+                                <td><strong>productpage</strong></td>
+                                <td>v1</td>
+                                <td>Page principale de l'application</td>
+                            </tr>
+                            <tr>
+                                <td><strong>details</strong></td>
+                                <td>v1</td>
+                                <td>Détails du livre</td>
+                            </tr>
+                            <tr>
+                                <td><strong>reviews</strong></td>
+                                <td>v1, v2, v3</td>
+                                <td>Avis des lecteurs (v2/v3 avec étoiles)</td>
+                            </tr>
+                            <tr>
+                                <td><strong>ratings</strong></td>
+                                <td>v1</td>
+                                <td>Système de notation</td>
+                            </tr>
+                        </tbody>
+                    </table>
+                </div>
+
+                <div class="content" id="waypoint">
+                    <h2>⚡ Waypoint Proxy - Couche L7</h2>
+
+                    <p>Le <strong>Waypoint Proxy</strong> est la couche L7 optionnelle d'Istio Ambient Mode qui permet le routage avancé.</p>
+
+                    <h3>Pourquoi le Waypoint ?</h3>
+
+                    <div class="grid">
+                        <div class="card" style="background: linear-gradient(135deg, #f6d365 0%, #fda085 100%);">
+                            <h4>❌ Sans Waypoint</h4>
+                            <ul>
+                                <li>✅ mTLS automatique</li>
+                                <li>✅ Métriques TCP</li>
+                                <li>❌ VirtualServices ignorés</li>
+                                <li>❌ Pas de traffic splitting</li>
+                                <li>❌ Pas de canary deployment</li>
+                            </ul>
+                        </div>
+                        <div class="card" style="background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); color: white;">
+                            <h4>✅ Avec Waypoint</h4>
+                            <ul>
+                                <li>✅ Toutes les fonctionnalités L4</li>
+                                <li>✅ VirtualServices actifs</li>
+                                <li>✅ DestinationRules appliqués</li>
+                                <li>✅ Canary, A/B testing</li>
+                                <li>✅ Fault injection, retries</li>
+                            </ul>
+                        </div>
+                    </div>
+
+                    <h3>Architecture du Flux de Trafic</h3>
+
+                    <div class="code-block" style="background: #2d3748;">
+<span class="comment"># Sans Waypoint (L4 uniquement)</span>
+productpage pod → ZTunnel (mTLS) → ZTunnel → reviews pod
+                    ↓
+            Load balancing simple
+
+<span class="comment"># Avec Waypoint (L4 + L7)</span>
+productpage pod → ZTunnel → <span class="keyword">Waypoint Proxy</span> → ZTunnel → reviews pod
+                              ↓
+                      VirtualService
+                      DestinationRule
+                      Traffic Splitting
+                    </div>
+
+                    <h3>Déploiement du Waypoint</h3>
+
+                    <p>Le Waypoint se déploie <strong>par namespace</strong> :</p>
+                    <div class="code-block"><span class="comment"># Pour un namespace spécifique</span>
+./deploy-waypoint.sh bookinfo
+
+<span class="comment"># Le script fait automatiquement :</span>
+<span class="comment"># 1. Crée le Gateway waypoint dans le namespace</span>
+<span class="comment"># 2. Ajoute le label istio.io/use-waypoint=waypoint au namespace</span>
+<span class="comment"># 3. Attend que le pod waypoint soit prêt</span></div>
+
+                    <p><strong>Note</strong> : Le script <span class="command">deploy-bookinfo.sh</span> déploie automatiquement le waypoint car Bookinfo utilise des VirtualServices.</p>
+
+                    <h3>Quand utiliser le Waypoint ?</h3>
+
+                    <table>
+                        <thead>
+                            <tr>
+                                <th>Fonctionnalité</th>
+                                <th>Requis</th>
+                                <th>Optionnel</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            <tr>
+                                <td>mTLS automatique</td>
+                                <td></td>
+                                <td>✅ ZTunnel suffit</td>
+                            </tr>
+                            <tr>
+                                <td>Métriques de base</td>
+                                <td></td>
+                                <td>✅ ZTunnel suffit</td>
+                            </tr>
+                            <tr>
+                                <td>VirtualServices</td>
+                                <td>✅ Waypoint requis</td>
+                                <td></td>
+                            </tr>
+                            <tr>
+                                <td>DestinationRules</td>
+                                <td>✅ Waypoint requis</td>
+                                <td></td>
+                            </tr>
+                            <tr>
+                                <td>Canary deployment</td>
+                                <td>✅ Waypoint requis</td>
+                                <td></td>
+                            </tr>
+                            <tr>
+                                <td>A/B testing</td>
+                                <td>✅ Waypoint requis</td>
+                                <td></td>
+                            </tr>
+                            <tr>
+                                <td>Fault injection</td>
+                                <td>✅ Waypoint requis</td>
+                                <td></td>
+                            </tr>
+                        </tbody>
+                    </table>
+
+                    <h3>Vérifier le Waypoint</h3>
+
+                    <div class="code-block"><span class="comment"># Vérifier le Gateway</span>
+kubectl get gateway waypoint -n bookinfo
+
+<span class="comment"># Vérifier le pod</span>
+kubectl get pods -n bookinfo -l gateway.networking.k8s.io/gateway-name=waypoint
+
+<span class="comment"># Vérifier le label du namespace</span>
+kubectl get namespace bookinfo -o jsonpath='{.metadata.labels.istio\.io/use-waypoint}'
+
+<span class="comment"># Script d'explication détaillée</span>
+./explain-waypoint.sh</div>
+
+                    <div class="warning-box" style="background: linear-gradient(135deg, #f093fb 0%, #f5576c 100%); padding: 20px; border-radius: 10px; margin: 20px 0; color: white;">
+                        <h4 style="margin-top: 0;">⚠️ Important : VirtualServices sans Waypoint</h4>
+                        <p>Si vous appliquez des VirtualServices sans déployer le Waypoint, ils seront <strong>ignorés</strong> et le trafic continuera en round-robin simple via ZTunnel L4.</p>
+                        <p>Pour que les VirtualServices fonctionnent, le Waypoint est <strong>obligatoire</strong>.</p>
+                    </div>
+
+                    <h3>Gestion du Waypoint</h3>
+
+                    <div class="grid">
+                        <div class="card">
+                            <h4>Déployer</h4>
+                            <div class="code-block">./deploy-waypoint.sh &lt;namespace&gt;</div>
+                        </div>
+                        <div class="card">
+                            <h4>Supprimer</h4>
+                            <div class="code-block">./cleanup-waypoint.sh &lt;namespace&gt;</div>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="content" id="prerequisites">
+                    <h2>📋 Prérequis</h2>
+
+                    <ul>
+                        <li>OpenShift <span class="highlight">4.12+</span> (SNO ou cluster complet)</li>
+                        <li>OpenShift Service Mesh Operator <span class="highlight">3.x</span> installé</li>
+                        <li><span class="command">oc</span> CLI</li>
+                        <li>Accès cluster-admin</li>
+                    </ul>
+
+                    <h3>Installation Service Mesh Operator</h3>
+                    <ol>
+                        <li>Console OpenShift → <strong>Operators</strong> → <strong>OperatorHub</strong></li>
+                        <li>Rechercher <strong>"OpenShift Service Mesh"</strong></li>
+                        <li>Cliquer sur <strong>Install</strong></li>
+                        <li>Sélectionner la version <strong>3.x</strong></li>
+                        <li>Attendre que le status soit <strong>Succeeded</strong></li>
+                    </ol>
+                </div>
+
+                <div class="content" id="installation">
+                    <h2>⚙️ Installation</h2>
+
+                    <h3>1. Vérifier les prérequis</h3>
+                    <div class="code-block">cd single-cluster/scripts
+./check-prerequisites.sh</div>
+
+                    <p>Le script vérifie :</p>
+                    <ul>
+                        <li>✅ CLI tools (oc/kubectl)</li>
+                        <li>✅ Connexion au cluster</li>
+                        <li>✅ Service Mesh Operator 3.x installé</li>
+                        <li>✅ Permissions cluster-admin</li>
+                        <li>✅ Pas de déploiements conflictuels</li>
+                    </ul>
+
+                    <h3>2. Choisir la méthode de déploiement</h3>
+
+                    <h4>Option A : Déploiement complet (recommandé)</h4>
+                    <p>Déploie Istio et Bookinfo en une seule commande :</p>
+                    <div class="code-block">./deploy-all.sh</div>
+
+                    <p>Le script déploie en 2 phases :</p>
+                    <ul>
+                        <li><strong>Phase 1</strong> : Infrastructure Istio (CNI, Control Plane, ZTunnel)</li>
+                        <li><strong>Phase 2</strong> : Application Bookinfo</li>
+                    </ul>
+                    <p><strong>Durée</strong> : ~5 minutes</p>
+
+                    <h4>Option B : Déploiement en 2 phases</h4>
+                    <p>Utile pour réutiliser Istio avec d'autres applications :</p>
+
+                    <div class="card" style="margin: 20px 0;">
+                        <h4>Phase 1 : Déployer Istio (Infrastructure L4)</h4>
+                        <div class="code-block">./deploy-istio.sh</div>
+                        <p>Déploie :</p>
+                        <ol>
+                            <li>Namespaces (istio-system, istio-cni, ztunnel)</li>
+                            <li>Gateway API CRDs</li>
+                            <li>Istio CNI</li>
+                            <li>Istio Control Plane (mode ambient)</li>
+                            <li>ZTunnel (proxy L4)</li>
+                        </ol>
+                        <p><strong>Durée</strong> : ~3 minutes</p>
+                        <p>À ce stade : ✅ mTLS automatique | ❌ Pas de VirtualServices</p>
+                    </div>
+
+                    <div class="card" style="margin: 20px 0;">
+                        <h4>Phase 2 : Déployer Bookinfo (avec Waypoint L7)</h4>
+                        <div class="code-block">./deploy-bookinfo.sh</div>
+                        <p>Déploie :</p>
+                        <ol>
+                            <li>Namespace bookinfo (avec label ambient)</li>
+                            <li>Service accounts</li>
+                            <li>Tous les services Bookinfo</li>
+                            <li><strong>Waypoint Proxy (infrastructure Istio L7)</strong></li>
+                            <li>VirtualServices et DestinationRules</li>
+                            <li>Gateway et Route OpenShift</li>
+                        </ol>
+                        <p><strong>Durée</strong> : ~3 minutes</p>
+                        <p><strong>Note</strong> : Le Waypoint est automatiquement déployé car Bookinfo utilise des VirtualServices.</p>
+                    </div>
+
+                    <div class="card" style="margin: 20px 0; background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); color: white;">
+                        <h4>Optionnel : Déployer le Waypoint manuellement</h4>
+                        <div class="code-block" style="color: #d4d4d4;">./deploy-waypoint.sh &lt;namespace&gt;</div>
+                        <p>Utilisez cette commande pour déployer le Waypoint dans un namespace spécifique sans déployer l'application complète.</p>
+                        <p><strong>Exemple</strong> : <span class="command">./deploy-waypoint.sh my-app</span></p>
+                    </div>
+
+                    <h3>3. Accéder à l'application</h3>
+                    <div class="code-block"><span class="comment"># URL affichée à la fin du déploiement</span>
+https://bookinfo-istio-system.apps.your-cluster.com/productpage
+
+<span class="comment"># Ou récupérer manuellement</span>
+oc get route bookinfo -n istio-system -o jsonpath='{.spec.host}'</div>
+                </div>
+
+                <div class="content" id="verification">
+                    <h2>✅ Vérification</h2>
+
+                    <h3>Vérifier les pods Istio</h3>
+                    <div class="code-block">oc get pods -n istio-system
+oc get pods -n ztunnel
+oc get pods -n bookinfo</div>
+
+                    <h3>Vérifier les services</h3>
+                    <div class="code-block">oc get svc -n bookinfo</div>
+
+                    <h3>Tester l'application</h3>
+                    <div class="code-block">curl https://$(oc get route bookinfo -n istio-system -o jsonpath='{.spec.host}')/productpage</div>
+
+                    <h3>Fonctionnalités testables</h3>
+                    <div class="grid">
+                        <div class="card">
+                            <h4>🔄 Load balancing</h4>
+                            <p>Rechargez plusieurs fois la page /productpage pour voir les différentes versions de reviews (v1, v2, v3)</p>
+                        </div>
+                        <div class="card">
+                            <h4>🔒 mTLS automatique</h4>
+                            <p>Toutes les communications sont automatiquement chiffrées en mTLS sans configuration</p>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="content" id="kiali">
+                    <h2>📊 Observabilité avec Kiali</h2>
+
+                    <p>Kiali fournit une visualisation complète de votre service mesh avec des graphiques interactifs, des métriques en temps réel et la validation de configuration.</p>
+
+                    <h3>1. Prérequis - Kiali Operator</h3>
+                    <p>Le <strong>Kiali Operator</strong> doit être installé depuis OperatorHub :</p>
+
+                    <ol>
+                        <li>Console OpenShift → <strong>Operators</strong> → <strong>OperatorHub</strong></li>
+                        <li>Rechercher <strong>"Kiali"</strong></li>
+                        <li>Installer <strong>Kiali Operator</strong> (canal stable)</li>
+                    </ol>
+
+                    <p>Ou via CLI :</p>
+                    <div class="code-block">cat &lt;&lt;EOF | oc apply -f -
+apiVersion: operators.coreos.com/v1alpha1
+kind: Subscription
+metadata:
+  name: kiali
+  namespace: openshift-operators
+spec:
+  channel: stable
+  name: kiali-ossm
+  source: redhat-operators
+  sourceNamespace: openshift-marketplace
+EOF</div>
+
+                    <h3>2. Déployer Kiali</h3>
+                    <div class="code-block">./deploy-kiali.sh</div>
+
+                    <p>Le script déploie :</p>
+                    <ul>
+                        <li>✅ <strong>Prometheus</strong> - Collecte des métriques Istio</li>
+                        <li>✅ <strong>Kiali</strong> - Interface de visualisation</li>
+                        <li>✅ <strong>Route OpenShift</strong> - Accès externe à Kiali</li>
+                    </ul>
+                    <p><strong>Durée</strong> : ~2 minutes</p>
+
+                    <h3>3. Accéder à Kiali</h3>
+                    <div class="code-block"><span class="comment"># URL affichée à la fin du déploiement</span>
+https://kiali-istio-system.apps.your-cluster.com
+
+<span class="comment"># Ou récupérer manuellement</span>
+oc get route kiali -n istio-system -o jsonpath='{.spec.host}'</div>
+
+                    <h3>4. Générer du trafic</h3>
+                    <p>Pour visualiser le trafic dans Kiali, générez des requêtes vers Bookinfo :</p>
+                    <div class="code-block">./generate-traffic.sh</div>
+
+                    <p>Le script envoie 100 requêtes par défaut. Pour un nombre personnalisé :</p>
+                    <div class="code-block">./generate-traffic.sh 500</div>
+
+                    <h3>5. Fonctionnalités Kiali</h3>
+                    <div class="grid">
+                        <div class="card">
+                            <h4>📈 Graph</h4>
+                            <p>Visualisation de la topologie des services et du flux de trafic en temps réel</p>
+                        </div>
+                        <div class="card">
+                            <h4>📱 Applications</h4>
+                            <p>Vue par application avec santé, métriques et performances</p>
+                        </div>
+                        <div class="card">
+                            <h4>⚙️ Workloads</h4>
+                            <p>Détails des déploiements, pods et leurs configurations</p>
+                        </div>
+                        <div class="card">
+                            <h4>🔧 Services</h4>
+                            <p>Configuration et métriques détaillées des services</p>
+                        </div>
+                        <div class="card">
+                            <h4>✅ Istio Config</h4>
+                            <p>Validation de la configuration Istio (VirtualServices, DestinationRules, etc.)</p>
+                        </div>
+                        <div class="card">
+                            <h4>🔒 Security</h4>
+                            <p>Visualisation du mTLS entre les services</p>
+                        </div>
+                    </div>
+
+                    <h3>6. Ce que vous verrez dans Kiali</h3>
+                    <div class="feature-list">
+                        <span class="feature-item">✅ Flux de trafic entre productpage → details</span>
+                        <span class="feature-item">✅ Flux de trafic entre productpage → reviews (v1, v2, v3)</span>
+                        <span class="feature-item">✅ Flux de trafic entre reviews → ratings</span>
+                        <span class="feature-item">✅ Répartition du load balancing (33% chaque version)</span>
+                        <span class="feature-item">✅ mTLS activé sur toutes les communications</span>
+                        <span class="feature-item">✅ Métriques (latence, débit, taux d'erreur)</span>
+                    </div>
+
+                    <div class="warning-box" style="background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); padding: 20px; border-radius: 10px; margin: 20px 0; color: white;">
+                        <h4 style="margin-top: 0;">💡 Astuce : Mode Ambient dans Kiali</h4>
+                        <p>Dans le graphique Kiali, vous ne verrez <strong>pas de sidecars</strong> car vous êtes en mode ambient. Le trafic L4 passe par <strong>ZTunnel</strong> (DaemonSet) qui n'apparaît pas dans le graphe applicatif.</p>
+                    </div>
+                </div>
+
+                <div class="content" id="traffic">
+                    <h2>🔀 Traffic Management (Gestion du Trafic)</h2>
+
+                    <p>Bookinfo est déployé avec des <strong>VirtualServices</strong> et <strong>DestinationRules</strong> Istio pour contrôler le routage du trafic <strong>interne</strong> (service-to-service) au niveau L7.</p>
+
+                    <div class="info-box" style="background: linear-gradient(135deg, #4facfe 0%, #00f2fe 100%); padding: 15px; border-radius: 8px; margin: 15px 0; color: white;">
+                        <h4 style="margin-top: 0;">📌 Note sur productpage</h4>
+                        <p><code>productpage</code> n'a <strong>pas de VirtualService</strong> car c'est le point d'entrée de l'application. Le trafic externe (Internet → productpage) passe par l'<strong>HTTPRoute</strong> du Gateway, pas par un VirtualService.</p>
+                        <p><strong>Services avec VirtualServices :</strong> reviews (v1/v2/v3), details, ratings (trafic mesh interne uniquement)</p>
+                    </div>
+
+                    <div class="warning-box" style="background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); padding: 20px; border-radius: 10px; margin: 20px 0; color: white;">
+                        <h4 style="margin-top: 0;">⚡ Prérequis : Waypoint Proxy</h4>
+                        <p>Les VirtualServices et DestinationRules nécessitent le <strong>Waypoint Proxy (L7)</strong> pour fonctionner.</p>
+                        <p>Le script <span class="command">deploy-bookinfo.sh</span> déploie automatiquement le waypoint. Si vous l'avez supprimé ou déployez manuellement, exécutez :</p>
+                        <div class="code-block" style="background: #2d3748; margin-top: 10px;">./deploy-waypoint.sh bookinfo</div>
+                    </div>
+
+                    <h3>Configuration par défaut</h3>
+                    <p>Le trafic vers <strong>reviews</strong> est distribué équitablement entre les 3 versions :</p>
+                    <ul>
+                        <li><strong>reviews v1</strong> : 33% (pas d'étoiles)</li>
+                        <li><strong>reviews v2</strong> : 33% (étoiles noires)</li>
+                        <li><strong>reviews v3</strong> : 34% (étoiles rouges)</li>
+                    </ul>
+
+                    <h3>Scénarios de routage disponibles</h3>
+                    <p>Utilisez le script interactif pour appliquer différents scénarios :</p>
+                    <div class="code-block">./apply-routing-scenario.sh</div>
+
+                    <table>
+                        <thead>
+                            <tr>
+                                <th>Scénario</th>
+                                <th>Description</th>
+                                <th>Cas d'usage</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            <tr>
+                                <td><strong>default</strong></td>
+                                <td>Round-robin 33/33/34</td>
+                                <td>Load balancing équilibré</td>
+                            </tr>
+                            <tr>
+                                <td><strong>v1-only</strong></td>
+                                <td>100% vers v1 (pas d'étoiles)</td>
+                                <td>Rollback vers version stable</td>
+                            </tr>
+                            <tr>
+                                <td><strong>v2-only</strong></td>
+                                <td>100% vers v2 (étoiles noires)</td>
+                                <td>Test d'une version spécifique</td>
+                            </tr>
+                            <tr>
+                                <td><strong>v3-only</strong></td>
+                                <td>100% vers v3 (étoiles rouges)</td>
+                                <td>Déploiement complet nouvelle version</td>
+                            </tr>
+                            <tr>
+                                <td><strong>canary-v3</strong></td>
+                                <td>90% v1, 10% v3</td>
+                                <td>Canary deployment progressif</td>
+                            </tr>
+                            <tr>
+                                <td><strong>deny-reviews</strong></td>
+                                <td>AuthorizationPolicy DENY</td>
+                                <td>Démonstration sécurité : bloquer reviews</td>
+                            </tr>
+                        </tbody>
+                    </table>
+
+                    <h3>Démonstration interactive</h3>
+                    <p>Lancez la démo complète qui vous guide à travers tous les scénarios :</p>
+                    <div class="code-block">./demo-traffic-routing.sh</div>
+
+                    <p>La démo montre :</p>
+                    <div class="feature-list">
+                        <span class="feature-item">✅ Routage vers une version spécifique</span>
+                        <span class="feature-item">✅ Canary deployment (déploiement progressif)</span>
+                        <span class="feature-item">✅ Sécurité avec AuthorizationPolicy (bloquer reviews)</span>
+                        <span class="feature-item">✅ Retour au load balancing par défaut</span>
+                    </div>
+
+                    <h3>Exemples de commandes</h3>
+
+                    <h4>Tout le trafic vers v3 (étoiles rouges)</h4>
+                    <div class="code-block">kubectl apply -f bookinfo/routing-scenarios/reviews-v3-only.yaml</div>
+
+                    <h4>Canary deployment (90% v1, 10% v3)</h4>
+                    <div class="code-block">kubectl apply -f bookinfo/routing-scenarios/reviews-canary-v3.yaml</div>
+
+                    <h4>Bloquer l'accès à reviews (AuthorizationPolicy)</h4>
+                    <div class="code-block">kubectl apply -f bookinfo/routing-scenarios/authz-deny-reviews.yaml</div>
+                    <p>La page productpage se charge mais la section reviews affiche : <strong>"Error fetching product reviews"</strong> (HTTP 403).</p>
+
+                    <div class="info-box" style="background: linear-gradient(135deg, #f59e0b 0%, #d97706 100%); padding: 15px; border-radius: 8px; margin: 15px 0; color: white;">
+                        <h4 style="margin-top: 0;">⚠️ Important : targetRefs en mode ambient</h4>
+                        <p>En mode ambient, utilisez <code>targetRefs</code> au lieu de <code>selector</code> :</p>
+                        <div style="background: #1e293b; padding: 10px; border-radius: 5px; margin-top: 10px; font-family: monospace; font-size: 0.9em;">
+spec:<br/>
+&nbsp;&nbsp;targetRefs:<br/>
+&nbsp;&nbsp;- kind: Service<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;name: reviews<br/>
+&nbsp;&nbsp;action: DENY
+                        </div>
+                    </div>
+
+                    <p>Pour restaurer l'accès :</p>
+                    <div class="code-block">kubectl delete authorizationpolicy deny-reviews -n bookinfo</div>
+
+                    <h3>Visualiser dans Kiali</h3>
+                    <p>Pour voir la distribution du trafic en temps réel :</p>
+                    <div class="code-block"><span class="comment"># Générer du trafic</span>
+./generate-traffic.sh 100
+
+<span class="comment"># Ouvrir Kiali</span>
+echo "https://$(oc get route kiali -n istio-system -o jsonpath='{.spec.host}')"</div>
+
+                    <p>Dans Kiali, le graphe montre :</p>
+                    <ul>
+                        <li>Les pourcentages de trafic vers chaque version</li>
+                        <li>Le poids configuré dans les VirtualServices</li>
+                        <li>Les métriques en temps réel (latence, débit, erreurs)</li>
+                    </ul>
+
+                    <div class="warning-box" style="background: linear-gradient(135deg, #10b981 0%, #059669 100%); padding: 20px; border-radius: 10px; margin: 20px 0; color: white;">
+                        <h4 style="margin-top: 0;">💡 Avantage du Mode Ambient</h4>
+                        <p>Tous ces changements de routage sont appliqués <strong>sans redémarrer les pods</strong> ! Le ZTunnel intercepte et route le trafic de manière transparente.</p>
+                    </div>
+                </div>
+
+                <div class="content" id="preuves">
+                    <h2>🔍 Preuves du Mode Ambient</h2>
+
+                    <p>Lancez le script de vérification :</p>
+                    <div class="code-block">./preuves-ambient-l4.sh</div>
+
+                    <div class="proof-box">
+                        <h4>PREUVE #1 : Pas de sidecars</h4>
+                        <p>✓ 1 conteneur par pod (application seulement)</p>
+                        <p>✓ Aucun conteneur istio-proxy</p>
+                    </div>
+
+                    <div class="proof-box">
+                        <h4>PREUVE #2 : Label ambient sur namespace</h4>
+                        <p>✓ istio.io/dataplane-mode: ambient</p>
+                    </div>
+
+                    <div class="proof-box">
+                        <h4>PREUVE #3 : ZTunnel DaemonSet actif</h4>
+                        <p>✓ 1 pod ZTunnel par nœud du cluster</p>
+                    </div>
+
+                    <div class="proof-box">
+                        <h4>PREUVE #4 : Connectivité inter-services</h4>
+                        <p>✓ productpage → reviews : HTTP 200</p>
+                        <p>✓ Trafic passe par ZTunnel en L4</p>
+                    </div>
+
+                    <div class="proof-box">
+                        <h4>PREUVE #5 : Istio en mode ambient</h4>
+                        <p>✓ Profile Istio : ambient</p>
+                    </div>
+
+                    <div class="proof-box">
+                        <h4>PREUVE #6 : ZTunnel reçoit les workloads</h4>
+                        <p>✓ Logs montrent les updates XDS depuis istiod</p>
+                    </div>
+                </div>
+
+                <div class="content" id="redirection">
+                    <h2>🔀 Comment le trafic est redirigé vers ZTunnel</h2>
+
+                    <p>Lancez le script d'explication :</p>
+                    <div class="code-block">./explain-traffic-redirection.sh</div>
+
+                    <h3>Mécanisme : Istio CNI Plugin</h3>
+                    <p>Le plugin CNI Istio configure chaque pod au démarrage pour rediriger le trafic réseau vers ZTunnel de manière transparente.</p>
+
+                    <div class="diagram">
+┌─────────────────────────────────────────────────┐
+│ 1. Pod démarre dans namespace 'ambient'        │
+└─────────────────────────────────────────────────┘
+                     ↓
+┌─────────────────────────────────────────────────┐
+│ 2. Kubernetes invoque le CNI plugin chain      │
+│    - CNI principal (OVN-Kubernetes)             │
+│    - Istio CNI plugin (chainé)                 │
+└─────────────────────────────────────────────────┘
+                     ↓
+┌─────────────────────────────────────────────────┐
+│ 3. Istio CNI détecte le label ambient          │
+└─────────────────────────────────────────────────┘
+                     ↓
+┌─────────────────────────────────────────────────┐
+│ 4. Istio CNI configure la redirection :        │
+│    - Règles iptables dans le netns du pod      │
+│    - Redirige vers ZTunnel (15001/15006)       │
+└─────────────────────────────────────────────────┘
+                     ↓
+┌─────────────────────────────────────────────────┐
+│ 5. Application envoie du trafic                │
+│    Ex: curl http://reviews:9080                │
+└─────────────────────────────────────────────────┘
+                     ↓
+┌─────────────────────────────────────────────────┐
+│ 6. iptables intercepte → ZTunnel               │
+│    (transparent pour l'application)             │
+└─────────────────────────────────────────────────┘
+                     ↓
+┌─────────────────────────────────────────────────┐
+│ 7. ZTunnel traite :                             │
+│    - mTLS encryption                            │
+│    - Routing intelligent                        │
+│    - Envoi via HBONE (port 15008)              │
+└─────────────────────────────────────────────────┘
+                    </div>
+
+                    <h3>Points clés</h3>
+                    <ul>
+                        <li><strong>Istio CNI</strong> installé comme plugin CNI sur chaque nœud</li>
+                        <li><strong>Règles iptables</strong> configurées dans le network namespace du pod</li>
+                        <li><strong>Redirection transparente</strong> vers ZTunnel (ports 15001/15006)</li>
+                        <li><strong>Application</strong> ne voit aucune différence</li>
+                        <li><strong>ZTunnel</strong> gère proxy L4 + mTLS + routing</li>
+                    </ul>
+                </div>
+
+                <div class="content" id="cleanup">
+                    <h2>🗑️ Nettoyage</h2>
+
+                    <h3>Nettoyage complet</h3>
+                    <p>Pour supprimer complètement Bookinfo, Kiali et toute l'infrastructure Istio :</p>
+                    <div class="code-block">cd single-cluster/scripts
+./cleanup.sh</div>
+                    <p>Le script supprime :</p>
+                    <ul>
+                        <li>✅ Bookinfo application</li>
+                        <li>✅ Kiali et Prometheus</li>
+                        <li>✅ Istio infrastructure (CNI, Control Plane, ZTunnel)</li>
+                    </ul>
+                    <p>Le script demande confirmation avant de tout supprimer.</p>
+
+                    <h3>Nettoyage partiel</h3>
+
+                    <div class="grid">
+                        <div class="card">
+                            <h4>🔸 Supprimer uniquement Bookinfo</h4>
+                            <p>Utile pour tester d'autres applications sur Istio :</p>
+                            <div class="code-block">./cleanup-bookinfo.sh</div>
+                            <p><strong>Supprime</strong> :</p>
+                            <ul>
+                                <li>Namespace bookinfo</li>
+                                <li>Gateway et Route</li>
+                            </ul>
+                            <p><strong>Conserve</strong> :</p>
+                            <ul>
+                                <li>Infrastructure Istio</li>
+                                <li>Kiali et Prometheus</li>
+                            </ul>
+                        </div>
+
+                        <div class="card">
+                            <h4>🔸 Supprimer uniquement Kiali</h4>
+                            <p>Désactive l'observabilité :</p>
+                            <div class="code-block">./cleanup-kiali.sh</div>
+                            <p><strong>Supprime</strong> :</p>
+                            <ul>
+                                <li>Kiali et sa Route</li>
+                                <li>Prometheus</li>
+                            </ul>
+                            <p><strong>Conserve</strong> :</p>
+                            <ul>
+                                <li>Infrastructure Istio</li>
+                                <li>Application Bookinfo</li>
+                            </ul>
+                        </div>
+
+                        <div class="card">
+                            <h4>🔸 Supprimer uniquement Istio</h4>
+                            <p class="warning">⚠️ Attention : Supprime toute l'infrastructure Istio</p>
+                            <div class="code-block">./cleanup-istio.sh</div>
+                            <p>Le script demande confirmation.</p>
+                        </div>
+                    </div>
+
+                    <h3>Cas d'usage du nettoyage partiel</h3>
+                    <div class="code-block"><span class="comment"># Tester rapidement une modification de Bookinfo</span>
+./cleanup-bookinfo.sh
+<span class="comment"># ... modifier les manifests ...</span>
+./deploy-bookinfo.sh
+
+<span class="comment"># Déployer une autre application sur Istio</span>
+./cleanup-bookinfo.sh
+<span class="comment"># ... déployer votre application avec label ambient ...</span></div>
+                </div>
+
+                <div class="content" id="troubleshooting">
+                    <h2>🔧 Troubleshooting</h2>
+
+                    <h3>Les pods ne démarrent pas</h3>
+                    <p><strong>Problème</strong> : Erreur de permissions OpenShift SCC</p>
+                    <div class="code-block"><span class="comment"># Accorder les permissions manuellement</span>
+oc adm policy add-scc-to-user anyuid -z bookinfo-productpage -n bookinfo
+oc adm policy add-scc-to-user anyuid -z bookinfo-details -n bookinfo
+oc adm policy add-scc-to-user anyuid -z bookinfo-reviews -n bookinfo
+oc adm policy add-scc-to-user anyuid -z bookinfo-ratings -n bookinfo</div>
+
+                    <h3>La Route ne fonctionne pas</h3>
+                    <p><strong>Vérifier</strong> :</p>
+                    <div class="code-block"><span class="comment"># Status de la Route</span>
+oc get route bookinfo -n istio-system
+
+<span class="comment"># Status du service Gateway</span>
+oc get svc -n istio-system | grep bookinfo-gateway
+
+<span class="comment"># Logs du Gateway</span>
+oc logs -n istio-system -l gateway.networking.k8s.io/gateway-name=bookinfo-gateway</div>
+
+                    <h3>istiod ne démarre pas</h3>
+                    <div class="code-block">oc logs -n istio-system -l app=istiod --tail=50</div>
+
+                    <h3>ZTunnel warnings</h3>
+                    <p>Si vous voyez des warnings "failed to connect to the Istio CNI node agent", c'est <span class="warning">normal</span> dans certaines configurations. Le trafic fonctionne quand même via le mode CNI.</p>
+
+                    <h3>Les VirtualServices ne fonctionnent pas (routage ignoré)</h3>
+                    <p><strong>Problème</strong> : Le trafic n'est pas routé selon les VirtualServices, toutes les versions sont toujours utilisées en round-robin.</p>
+
+                    <p><strong>Cause</strong> : Le Waypoint Proxy n'est pas déployé ou le namespace ne l'utilise pas.</p>
+
+                    <p><strong>Solution</strong> :</p>
+
+                    <div class="code-block"><span class="comment"># 1. Vérifier le waypoint</span>
+kubectl get gateway waypoint -n bookinfo
+kubectl get pods -n bookinfo -l gateway.networking.k8s.io/gateway-name=waypoint
+
+<span class="comment"># 2. Si le waypoint n'existe pas, le déployer</span>
+./deploy-waypoint.sh bookinfo
+
+<span class="comment"># 3. Vérifier que le namespace utilise le waypoint</span>
+kubectl get namespace bookinfo -o jsonpath='{.metadata.labels.istio\.io/use-waypoint}'
+
+<span class="comment"># 4. Si le label est absent, l'ajouter</span>
+kubectl label namespace bookinfo istio.io/use-waypoint=waypoint
+
+<span class="comment"># 5. Vérifier la configuration des VirtualServices</span>
+kubectl get virtualservice reviews -n bookinfo -o yaml
+
+<span class="comment"># 6. Script d'explication détaillée</span>
+./explain-waypoint.sh</div>
+
+                    <div class="warning-box" style="background: linear-gradient(135deg, #f093fb 0%, #f5576c 100%); padding: 20px; border-radius: 10px; margin: 20px 0; color: white;">
+                        <h4 style="margin-top: 0;">💡 Point Clé : L4 vs L7</h4>
+                        <p><strong>Sans Waypoint</strong> : Seul ZTunnel (L4) fonctionne → mTLS OK, VirtualServices IGNORÉS</p>
+                        <p><strong>Avec Waypoint</strong> : ZTunnel (L4) + Waypoint (L7) → mTLS OK, VirtualServices ACTIFS</p>
+                    </div>
+
+                    <h3>Waypoint pod ne démarre pas</h3>
+                    <p><strong>Vérifier les logs</strong> :</p>
+                    <div class="code-block">kubectl logs -n bookinfo -l gateway.networking.k8s.io/gateway-name=waypoint --tail=50
+
+<span class="comment"># Vérifier les events</span>
+kubectl get events -n bookinfo --sort-by='.lastTimestamp' | grep waypoint</div>
+
+                    <h3>API Version incorrecte (v1beta1 vs v1)</h3>
+                    <p><strong>Problème</strong> : Les VirtualServices ou DestinationRules utilisent une ancienne API version.</p>
+                    <p><strong>Solution</strong> : Utiliser <span class="command">networking.istio.io/v1</span> au lieu de v1beta1</p>
+                    <div class="code-block"><span class="comment"># Correct</span>
+apiVersion: networking.istio.io/v1
+kind: VirtualService
+
+<span class="comment"># Incorrect (obsolète)</span>
+apiVersion: networking.istio.io/v1beta1
+kind: VirtualService</div>
+                </div>
+
+                <div class="content" id="scripts">
+                    <h2>📜 Scripts disponibles</h2>
+
+                    <h3>Scripts de vérification</h3>
+                    <div class="grid">
+                        <div class="card">
+                            <h4>check-prerequisites.sh</h4>
+                            <p>Vérification complète des prérequis avant déploiement</p>
+                        </div>
+                        <div class="card">
+                            <h4>preuves-ambient-l4.sh</h4>
+                            <p>Démonstration des 6 preuves du mode ambient</p>
+                        </div>
+                        <div class="card">
+                            <h4>verify-ambient-mode.sh</h4>
+                            <p>Vérification détaillée du mode ambient</p>
+                        </div>
+                    </div>
+
+                    <h3>Scripts de déploiement</h3>
+                    <div class="grid">
+                        <div class="card">
+                            <h4>deploy-all.sh</h4>
+                            <p>Déploiement complet (Istio + Bookinfo + option Kiali)</p>
+                        </div>
+                        <div class="card">
+                            <h4>deploy-istio.sh</h4>
+                            <p>Déploiement Istio L4 (CNI, Control Plane, ZTunnel)</p>
+                        </div>
+                        <div class="card">
+                            <h4>deploy-waypoint.sh</h4>
+                            <p>Déploiement Waypoint L7 pour un namespace</p>
+                        </div>
+                        <div class="card">
+                            <h4>deploy-bookinfo.sh</h4>
+                            <p>Déploiement Bookinfo (inclut waypoint automatiquement)</p>
+                        </div>
+                        <div class="card">
+                            <h4>deploy-kiali.sh</h4>
+                            <p>Déploiement Kiali et Prometheus pour observabilité</p>
+                        </div>
+                    </div>
+
+                    <h3>Scripts de nettoyage</h3>
+                    <div class="grid">
+                        <div class="card">
+                            <h4>cleanup.sh</h4>
+                            <p>Nettoyage complet (Bookinfo + Kiali + Istio)</p>
+                        </div>
+                        <div class="card">
+                            <h4>cleanup-bookinfo.sh</h4>
+                            <p>Nettoyage Bookinfo uniquement (garde Istio et Kiali)</p>
+                        </div>
+                        <div class="card">
+                            <h4>cleanup-waypoint.sh</h4>
+                            <p>Nettoyage Waypoint d'un namespace (garde les apps)</p>
+                        </div>
+                        <div class="card">
+                            <h4>cleanup-kiali.sh</h4>
+                            <p>Nettoyage Kiali et Prometheus (garde Istio)</p>
+                        </div>
+                        <div class="card">
+                            <h4>cleanup-istio.sh</h4>
+                            <p>Nettoyage Istio uniquement (destructif)</p>
+                        </div>
+                    </div>
+
+                    <h3>Scripts de gestion du trafic</h3>
+                    <div class="grid">
+                        <div class="card">
+                            <h4>apply-routing-scenario.sh</h4>
+                            <p>Appliquer différents scénarios de routage (v1-only, canary, etc.)</p>
+                        </div>
+                        <div class="card">
+                            <h4>demo-traffic-routing.sh</h4>
+                            <p>Démo interactive complète de gestion du trafic</p>
+                        </div>
+                        <div class="card">
+                            <h4>generate-traffic.sh</h4>
+                            <p>Génération de trafic pour visualisation dans Kiali</p>
+                        </div>
+                    </div>
+
+                    <h3>Scripts utilitaires</h3>
+                    <div class="grid">
+                        <div class="card">
+                            <h4>configure-ingress.sh</h4>
+                            <p>Basculer entre Route OpenShift et Gateway API</p>
+                        </div>
+                        <div class="card">
+                            <h4>demo-with-kiali.sh</h4>
+                            <p>Démo interactive Bookinfo avec Kiali</p>
+                        </div>
+                        <div class="card">
+                            <h4>explain-traffic-redirection.sh</h4>
+                            <p>Explication de la redirection de trafic vers ZTunnel</p>
+                        </div>
+                        <div class="card">
+                            <h4>explain-waypoint.sh</h4>
+                            <p>Explication détaillée du Waypoint Proxy L7</p>
+                        </div>
+                        <div class="card">
+                            <h4>serve-docs.sh</h4>
+                            <p>Serveur HTTP pour la documentation</p>
+                        </div>
+                    </div>
+
+                    <h3>Structure des fichiers</h3>
+                    <div class="code-block">ossm3-bookinfo-ambient/
+├── single-cluster/
+│   ├── manifests/
+│   │   ├── istio-cni.yaml
+│   │   ├── istio.yaml
+│   │   ├── ztunnel.yaml                 <span class="comment"># Proxy L4</span>
+│   │   ├── waypoint.yaml                <span class="comment"># Proxy L7 (optionnel)</span>
+│   │   ├── gatewayclass.yaml
+│   │   ├── prometheus.yaml              <span class="comment"># Métriques</span>
+│   │   └── kiali.yaml                   <span class="comment"># Observabilité</span>
+│   │
+│   ├── bookinfo/
+│   │   ├── namespace.yaml
+│   │   ├── serviceaccounts.yaml
+│   │   ├── bookinfo.yaml
+│   │   ├── gateway.yaml
+│   │   ├── traffic-management.yaml   <span class="comment"># VirtualServices + DestinationRules</span>
+│   │   └── routing-scenarios/        <span class="comment"># Scénarios prédéfinis</span>
+│   │       ├── reviews-v1-only.yaml
+│   │       ├── reviews-v2-only.yaml
+│   │       ├── reviews-v3-only.yaml
+│   │       ├── reviews-canary-v3.yaml
+│   │       └── authz-deny-reviews.yaml   <span class="comment"># AuthorizationPolicy</span>
+│   │
+│   ├── scripts/
+│   │   ├── check-prerequisites.sh        <span class="comment"># Vérification prérequis</span>
+│   │   │
+│   │   ├── deploy-all.sh                 <span class="comment"># Déploiement complet</span>
+│   │   ├── deploy-istio.sh               <span class="comment"># Déploiement Istio L4</span>
+│   │   ├── deploy-waypoint.sh            <span class="comment"># Déploiement Waypoint L7</span>
+│   │   ├── deploy-bookinfo.sh            <span class="comment"># Déploiement Bookinfo</span>
+│   │   ├── deploy-kiali.sh               <span class="comment"># Déploiement Kiali</span>
+│   │   │
+│   │   ├── cleanup.sh                    <span class="comment"># Nettoyage complet</span>
+│   │   ├── cleanup-bookinfo.sh           <span class="comment"># Nettoyage Bookinfo</span>
+│   │   ├── cleanup-waypoint.sh           <span class="comment"># Nettoyage Waypoint</span>
+│   │   ├── cleanup-kiali.sh              <span class="comment"># Nettoyage Kiali</span>
+│   │   ├── cleanup-istio.sh              <span class="comment"># Nettoyage Istio</span>
+│   │   │
+│   │   ├── configure-ingress.sh          <span class="comment"># Config Route/Gateway</span>
+│   │   ├── generate-traffic.sh           <span class="comment"># Génération trafic</span>
+│   │   ├── apply-routing-scenario.sh     <span class="comment"># Appliquer scénarios routage</span>
+│   │   ├── demo-traffic-routing.sh       <span class="comment"># Démo routage</span>
+│   │   ├── demo-with-kiali.sh            <span class="comment"># Démo Kiali</span>
+│   │   ├── preuves-ambient-l4.sh         <span class="comment"># Preuves ambient</span>
+│   │   ├── verify-ambient-mode.sh        <span class="comment"># Vérification ambient</span>
+│   │   ├── explain-traffic-redirection.sh <span class="comment"># Explication CNI</span>
+│   │   ├── explain-waypoint.sh           <span class="comment"># Explication Waypoint</span>
+│   │   └── serve-docs.sh                 <span class="comment"># Serveur docs</span>
+│   │
+│   ├── docs/
+│   │   └── index.html                    <span class="comment"># Documentation HTML</span>
+│   │
+│   └── README.md
+│
+└── README.md</div>
+                </div>
+
+                <div class="content">
+                    <h2>📚 Références</h2>
+                    <ul>
+                        <li><a href="https://docs.redhat.com/en/documentation/red_hat_openshift_service_mesh/3.1/" target="_blank">OpenShift Service Mesh 3 Documentation</a></li>
+                        <li><a href="https://istio.io/latest/docs/ambient/" target="_blank">Istio Ambient Mesh</a></li>
+                        <li><a href="https://istio.io/latest/docs/examples/bookinfo/" target="_blank">Bookinfo Application</a></li>
+                        <li><a href="https://gateway-api.sigs.k8s.io/" target="_blank">Gateway API</a></li>
+                    </ul>
+                </div>
+            </main>
+        </div>
+
+        <footer>
+            <p>Documentation générée pour OpenShift Service Mesh 3 - Mode Ambient</p>
+            <p>© 2026 - Bookinfo Demo</p>
+        </footer>
+    </div>
+
+    <script>
+        // Add copy buttons to all code blocks
+        document.addEventListener('DOMContentLoaded', function() {
+            const codeBlocks = document.querySelectorAll('.code-block');
+
+            codeBlocks.forEach(function(codeBlock) {
+                // Create container
+                const container = document.createElement('div');
+                container.className = 'code-container';
+
+                // Wrap code block
+                codeBlock.parentNode.insertBefore(container, codeBlock);
+                container.appendChild(codeBlock);
+
+                // Create copy button
+                const copyBtn = document.createElement('button');
+                copyBtn.className = 'copy-btn';
+                copyBtn.textContent = '📋 Copier';
+                copyBtn.setAttribute('aria-label', 'Copier le code');
+
+                // Add copy functionality
+                copyBtn.addEventListener('click', function() {
+                    // Get text content without HTML tags
+                    const text = codeBlock.textContent.trim();
+
+                    // Copy to clipboard
+                    navigator.clipboard.writeText(text).then(function() {
+                        // Success feedback
+                        copyBtn.textContent = '✓ Copié !';
+                        copyBtn.classList.add('copied');
+
+                        // Reset after 2 seconds
+                        setTimeout(function() {
+                            copyBtn.textContent = '📋 Copier';
+                            copyBtn.classList.remove('copied');
+                        }, 2000);
+                    }).catch(function(err) {
+                        // Fallback for older browsers
+                        const textarea = document.createElement('textarea');
+                        textarea.value = text;
+                        textarea.style.position = 'fixed';
+                        textarea.style.opacity = '0';
+                        document.body.appendChild(textarea);
+                        textarea.select();
+
+                        try {
+                            document.execCommand('copy');
+                            copyBtn.textContent = '✓ Copié !';
+                            copyBtn.classList.add('copied');
+
+                            setTimeout(function() {
+                                copyBtn.textContent = '📋 Copier';
+                                copyBtn.classList.remove('copied');
+                            }, 2000);
+                        } catch (err) {
+                            copyBtn.textContent = '✗ Erreur';
+                            setTimeout(function() {
+                                copyBtn.textContent = '📋 Copier';
+                            }, 2000);
+                        }
+
+                        document.body.removeChild(textarea);
+                    });
+                });
+
+                // Add button to container
+                container.appendChild(copyBtn);
+            });
+        });
+
+        // Smooth scroll for navigation links
+        document.querySelectorAll('a[href^="#"]').forEach(anchor => {
+            anchor.addEventListener('click', function (e) {
+                e.preventDefault();
+                const target = document.querySelector(this.getAttribute('href'));
+                if (target) {
+                    target.scrollIntoView({
+                        behavior: 'smooth',
+                        block: 'start'
+                    });
+                }
+            });
+        });
+    </script>
+</body>
+</html>

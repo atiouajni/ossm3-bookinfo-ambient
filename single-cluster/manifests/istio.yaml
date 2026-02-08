@@ -1,0 +1,13 @@
+apiVersion: sailoperator.io/v1
+kind: Istio
+metadata:
+  name: default
+spec:
+  version: v1.26.4
+  namespace: istio-system
+  profile: ambient
+  values:
+    global:
+      meshID: mesh1
+    pilot:
+      trustedZtunnelNamespace: ztunnel

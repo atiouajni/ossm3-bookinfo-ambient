@@ -1,0 +1,99 @@
+---
+# DestinationRule for reviews with 3 versions
+apiVersion: networking.istio.io/v1
+kind: DestinationRule
+metadata:
+  name: reviews
+  namespace: bookinfo
+spec:
+  host: reviews
+  subsets:
+  - name: v1
+    labels:
+      version: v1
+  - name: v2
+    labels:
+      version: v2
+  - name: v3
+    labels:
+      version: v3
+---
+# DestinationRule for ratings
+apiVersion: networking.istio.io/v1
+kind: DestinationRule
+metadata:
+  name: ratings
+  namespace: bookinfo
+spec:
+  host: ratings
+  subsets:
+  - name: v1
+    labels:
+      version: v1
+---
+# DestinationRule for details
+apiVersion: networking.istio.io/v1
+kind: DestinationRule
+metadata:
+  name: details
+  namespace: bookinfo
+spec:
+  host: details
+  subsets:
+  - name: v1
+    labels:
+      version: v1
+---
+# VirtualService for reviews - round-robin across all versions
+apiVersion: networking.istio.io/v1
+kind: VirtualService
+metadata:
+  name: reviews
+  namespace: bookinfo
+spec:
+  hosts:
+  - reviews
+  http:
+  - route:
+    - destination:
+        host: reviews
+        subset: v1
+      weight: 33
+    - destination:
+        host: reviews
+        subset: v2
+      weight: 33
+    - destination:
+        host: reviews
+        subset: v3
+      weight: 34
+---
+# VirtualService for ratings
+apiVersion: networking.istio.io/v1
+kind: VirtualService
+metadata:
+  name: ratings
+  namespace: bookinfo
+spec:
+  hosts:
+  - ratings
+  http:
+  - route:
+    - destination:
+        host: ratings
+        subset: v1
+---
+# VirtualService for details
+apiVersion: networking.istio.io/v1
+kind: VirtualService
+metadata:
+  name: details
+  namespace: bookinfo
+spec:
+  hosts:
+  - details
+  http:
+  - route:
+    - destination:
+        host: details
+        subset: v1

@@ -1,0 +1,16 @@
+# AuthorizationPolicy - Deny all traffic to reviews service
+# In ambient mode: use targetRefs to target the service directly
+apiVersion: security.istio.io/v1
+kind: AuthorizationPolicy
+metadata:
+  name: deny-reviews
+  namespace: bookinfo
+spec:
+  # Target the reviews service using targetRefs (ambient mode)
+  targetRefs:
+  - kind: Service
+    group: ""
+    name: reviews
+  action: DENY
+  rules:
+  - {}  # Empty rule = match all traffic
