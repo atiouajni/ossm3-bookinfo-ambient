@@ -1,0 +1,18 @@
+apiVersion: route.openshift.io/v1
+kind: Route
+metadata:
+  name: jaeger-query
+  namespace: istio-system
+  labels:
+    app: tempo
+spec:
+  to:
+    kind: Service
+    name: tempo-tempo-jaegerui
+    weight: 100
+  port:
+    targetPort: jaeger-ui
+  tls:
+    termination: edge
+    insecureEdgeTerminationPolicy: Redirect
+  wildcardPolicy: None

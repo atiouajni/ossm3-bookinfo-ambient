@@ -55,7 +55,7 @@ Intégration complète du distributed tracing dans la démo Bookinfo avec Grafan
 
 ## Composants déployés
 
-### 1. Grafana Tempo
+### 1. Grafana Tempo (avec Jaeger UI intégrée)
 **Rôle** : Backend de stockage et requête des traces
 
 **Fonctionnalités** :
@@ -64,10 +64,12 @@ Intégration complète du distributed tracing dans la démo Bookinfo avec Grafan
 - Génération de métriques à partir des traces
 - Corrélation avec Prometheus (exemplars)
 
-**Endpoints** :
-- `tempo.istio-system.svc.cluster.local:3200` (HTTP API)
-- `tempo.istio-system.svc.cluster.local:4317` (OTLP gRPC)
-- `tempo.istio-system.svc.cluster.local:4318` (OTLP HTTP)
+**Endpoints** (créés automatiquement par l'opérateur):
+- `tempo-tempo.istio-system.svc.cluster.local:3200` (HTTP API / Query)
+- `tempo-tempo.istio-system.svc.cluster.local:4317` (OTLP gRPC Receiver)
+- `tempo-tempo.istio-system.svc.cluster.local:4318` (OTLP HTTP Receiver)
+
+**Note**: L'opérateur TempoMonolithic crée automatiquement un service nommé `tempo-tempo` (format: `<CR-name>-<CR-name>`).
 
 ### 2. OpenTelemetry Collector
 **Rôle** : Agrégateur et routeur de traces
@@ -82,18 +84,25 @@ Intégration complète du distributed tracing dans la démo Bookinfo avec Grafan
 - `otel-collector.istio-system.svc.cluster.local:4317` (OTLP gRPC)
 - `otel-collector.istio-system.svc.cluster.local:4318` (OTLP HTTP)
 
-### 3. Grafana
-**Rôle** : Interface de visualisation
-
-**Datasources configurées** :
-- **Tempo** : Visualisation des traces
-- **Prometheus** : Métriques et exemplars
+### 3. Jaeger UI (intégrée dans Tempo)
+**Rôle** : Interface web pour visualiser les traces
 
 **Fonctionnalités** :
-- Trace Explorer
-- Service Graph (visualisation des dépendances)
-- Exemplars (lien métriques → traces)
-- TraceQL queries
+- Interface Jaeger familière et éprouvée
+- Recherche de traces par service, opération, tags
+- Visualisation des spans et dépendances
+- Graphe de dépendances des services
+- Analyse de latence
+- Comparaison de traces
+
+**Avantages vs Grafana** :
+- ✅ Pas de configuration de datasource nécessaire
+- ✅ Interface dédiée au tracing (plus simple)
+- ✅ Activée automatiquement par l'opérateur Tempo
+- ✅ Accès direct sans authentification (route personnalisée)
+
+**Note sur l'authentification** :
+L'opérateur Tempo crée une route avec OAuth par défaut (`tempo-tempo-jaegerui`), ce qui peut causer des erreurs d'authentification. Cette démo inclut une **route personnalisée sans OAuth** (`jaeger-query`) pour un accès direct et simplifié.
 
 ## Déploiement
 
@@ -101,9 +110,53 @@ Intégration complète du distributed tracing dans la démo Bookinfo avec Grafan
 
 ### Prérequis
 
+- **Tempo Operator** installé sur OpenShift (pour la CR TempoMonolithic)
 - Bookinfo déjà déployé avec Istio en mode ambient
 - Prometheus déjà déployé (pour les métriques)
 - Kiali optionnel (pour comparaison)
+
+#### Installation du Tempo Operator
+
+Via la console OpenShift:
+1. **Operators** → **OperatorHub**
+2. Rechercher **"Tempo Operator"**
+3. Cliquer sur **Install**
+4. Namespace: **openshift-operators** (par défaut)
+5. Attendre que le status soit **Succeeded**
+
+Ou via CLI:
+```bash
+oc apply -f - <<EOF
+apiVersion: operators.coreos.com/v1alpha1
+kind: Subscription
+metadata:
+  name: tempo-operator
+  namespace: openshift-operators
+spec:
+  channel: stable
+  name: tempo-operator
+  source: redhat-operators
+  sourceNamespace: openshift-marketplace
+EOF
+```
+
+### Vérification des prérequis
+
+Avant de déployer, vérifiez que tous les prérequis sont en place:
+
+```bash
+cd tracing/scripts
+./check-prerequisites.sh
+```
+
+Le script vérifie:
+- ✅ Présence de `oc` ou `kubectl`
+- ✅ Connexion au cluster
+- ✅ Tempo Operator installé et opérationnel
+- ✅ Istio déployé (istiod)
+- ✅ Prometheus (optionnel)
+- ✅ Bookinfo (optionnel pour tester)
+- ✅ Absence de déploiements conflictuels
 
 ### Installation complète
 
@@ -126,59 +179,59 @@ Ce script déploie dans l'ordre :
 #### 1. Déployer Tempo
 
 ```bash
-kubectl apply -f tracing/manifests/tempo.yaml
+oc apply -f tracing/manifests/tempo.yaml
 ```
 
 Vérifier le déploiement :
 ```bash
-kubectl get pods -n istio-system -l app=tempo
-kubectl logs -n istio-system -l app=tempo --tail=20
+oc get pods -n istio-system -l app=tempo
+oc logs -n istio-system -l app=tempo --tail=20
 ```
 
 #### 2. Déployer OpenTelemetry Collector
 
 ```bash
-kubectl apply -f tracing/manifests/otel-collector.yaml
+oc apply -f tracing/manifests/otel-collector.yaml
 ```
 
 Vérifier :
 ```bash
-kubectl get pods -n istio-system -l app=otel-collector
-kubectl logs -n istio-system -l app=otel-collector --tail=20
+oc get pods -n istio-system -l app=otel-collector
+oc logs -n istio-system -l app=otel-collector --tail=20
 ```
 
 #### 3. Déployer Grafana
 
 ```bash
-kubectl apply -f tracing/manifests/grafana.yaml
+oc apply -f tracing/manifests/grafana.yaml
 ```
 
 Vérifier et récupérer l'URL :
 ```bash
-kubectl get route grafana -n istio-system
-echo "https://$(kubectl get route grafana -n istio-system -o jsonpath='{.spec.host}')"
+oc get route grafana -n istio-system
+echo "https://$(oc get route grafana -n istio-system -o jsonpath='{.spec.host}')"
 ```
 
 #### 4. Configurer Istio pour le tracing
 
 ```bash
-kubectl apply -f tracing/manifests/istio-tracing-config.yaml
+oc apply -f tracing/manifests/istio-tracing-config.yaml
 ```
 
 Attendre le redémarrage d'istiod :
 ```bash
-kubectl rollout status deployment istiod -n istio-system
+oc rollout status deployment istiod -n istio-system
 ```
 
 #### 5. Activer le tracing via Telemetry API
 
 ```bash
-kubectl apply -f tracing/manifests/telemetry.yaml
+oc apply -f tracing/manifests/telemetry.yaml
 ```
 
 Vérifier :
 ```bash
-kubectl get telemetry -A
+oc get telemetry -A
 ```
 
 ## Vérification
@@ -186,13 +239,29 @@ kubectl get telemetry -A
 ### 1. Vérifier que tous les pods sont Running
 
 ```bash
-kubectl get pods -n istio-system | grep -E '(tempo|otel|grafana)'
+oc get pods -n istio-system | grep -E '(tempo|otel|grafana)'
 ```
 
 Vous devriez voir :
-- `tempo-xxx` → Running
+- `tempo-0` → Running (StatefulSet géré par l'opérateur)
 - `otel-collector-xxx` → Running
 - `grafana-xxx` → Running
+
+Vérifier l'instance TempoMonolithic:
+```bash
+oc get tempomonolithic tempo -n istio-system
+oc describe tempomonolithic tempo -n istio-system
+```
+
+Vérifier les services créés par l'opérateur:
+```bash
+oc get svc -n istio-system -l app.kubernetes.io/instance=tempo
+```
+
+Le service principal devrait être `tempo-tempo` avec les ports:
+- 3200 (http)
+- 4317 (otlp-grpc)
+- 4318 (otlp-http)
 
 ### 2. Générer du trafic
 
@@ -214,7 +283,7 @@ done
 
 ```bash
 # Via API directe
-kubectl port-forward -n istio-system svc/tempo 3200:3200 &
+oc port-forward -n istio-system svc/tempo-tempo 3200:3200 &
 
 # Lister les services avec traces
 curl -s http://localhost:3200/api/search/tags | jq
@@ -223,17 +292,17 @@ curl -s http://localhost:3200/api/search/tags | jq
 curl -s "http://localhost:3200/api/search?tags=service.name%3Dproductpage" | jq
 ```
 
-### 4. Ouvrir Grafana
+### 4. Ouvrir Jaeger UI
 
 ```bash
-echo "https://$(kubectl get route grafana -n istio-system -o jsonpath='{.spec.host}')"
+echo "https://$(oc get route jaeger-query -n istio-system -o jsonpath='{.spec.host}')"
 ```
 
-Dans Grafana :
-1. **Explore** → Sélectionner **Tempo** datasource
-2. **Query type** → Search
-3. **Service Name** → `productpage.bookinfo`
-4. Cliquer **Run Query**
+Dans Jaeger UI (pas d'authentification requise):
+1. **Search** → Service: `productpage.bookinfo`
+2. Opération: Toutes (ou sélectionner une opération spécifique)
+3. Cliquer **Find Traces**
+4. Cliquer sur une trace pour voir les détails et le graphique des spans
 
 Vous devriez voir les traces des requêtes vers l'application Bookinfo.
 
@@ -412,7 +481,7 @@ Dans Tempo :
 
 Appliquer la politique de déni :
 ```bash
-kubectl apply -f ../bookinfo/routing-scenarios/authz-deny-reviews.yaml
+oc apply -f ../bookinfo/routing-scenarios/authz-deny-reviews.yaml
 ```
 
 Générer du trafic :
@@ -437,13 +506,49 @@ Overhead typique en mode ambient : **< 5ms**
 
 ## Troubleshooting
 
+### Erreur OAuth lors de l'accès à Jaeger UI
+
+**Symptôme**: Message d'erreur `server_error` ou `authorization server encountered an unexpected condition` lors de l'accès à l'URL Jaeger UI.
+
+**Cause**: La route par défaut créée par l'opérateur Tempo (`tempo-tempo-jaegerui`) utilise l'authentification OAuth OpenShift.
+
+**Solution 1 - Utiliser la route sans OAuth (recommandé)**:
+```bash
+# Vérifier que la route sans OAuth existe
+oc get route jaeger-query -n istio-system
+
+# Si elle n'existe pas, la créer
+oc apply -f tracing/manifests/jaeger-route.yaml
+
+# Obtenir l'URL
+oc get route jaeger-query -n istio-system
+```
+
+**Solution 2 - Redéployer avec la route sans OAuth**:
+```bash
+cd tracing/scripts
+./deploy-tracing.sh
+```
+
+Le script crée automatiquement une route `jaeger-query` sans OAuth.
+
+**Solution 3 - Script de correction**:
+```bash
+cd tracing/scripts
+./fix-jaeger-oauth.sh
+```
+
+**URLs à utiliser**:
+- ✅ **Route sans OAuth**: `jaeger-query` (recommandée pour la démo)
+- ❌ **Route avec OAuth**: `tempo-tempo-jaegerui` (créée par l'opérateur, peut causer des erreurs)
+
 ### Les traces n'apparaissent pas dans Tempo
 
 **1. Vérifier que le trafic passe par le waypoint**
 
 ```bash
-kubectl get gateway waypoint -n bookinfo
-kubectl get pods -n bookinfo -l gateway.networking.k8s.io/gateway-name=waypoint
+oc get gateway waypoint -n bookinfo
+oc get pods -n bookinfo -l gateway.networking.k8s.io/gateway-name=waypoint
 ```
 
 Sans waypoint, seules les traces L4 (ztunnel) sont générées.
@@ -451,7 +556,7 @@ Sans waypoint, seules les traces L4 (ztunnel) sont générées.
 **2. Vérifier les logs OpenTelemetry Collector**
 
 ```bash
-kubectl logs -n istio-system -l app=otel-collector --tail=50
+oc logs -n istio-system -l app=otel-collector --tail=50
 ```
 
 Chercher les erreurs d'export vers Tempo.
@@ -459,26 +564,86 @@ Chercher les erreurs d'export vers Tempo.
 **3. Vérifier les logs Tempo**
 
 ```bash
-kubectl logs -n istio-system -l app=tempo --tail=50
+oc logs -n istio-system -l app=tempo --tail=50
 ```
 
 **4. Tester la connectivité OTLP**
 
 ```bash
-kubectl run -it --rm debug --image=curlimages/curl --restart=Never -- \
+oc run -it --rm debug --image=curlimages/curl --restart=Never -- \
   curl -v http://otel-collector.istio-system.svc.cluster.local:4318/v1/traces
 ```
 
 ### Grafana ne trouve pas le datasource Tempo
 
-**Vérifier la configuration** :
+**1. Vérifier que le service Tempo existe**:
 ```bash
-kubectl get configmap grafana-datasources -n istio-system -o yaml
+oc get svc tempo-tempo -n istio-system
 ```
 
-**Redémarrer Grafana** :
+Le service devrait exposer les ports 3200, 4317, 4318.
+
+**2. Tester la connectivité depuis Grafana vers Tempo**:
 ```bash
-kubectl rollout restart deployment grafana -n istio-system
+# Obtenir le nom du pod Grafana
+GRAFANA_POD=$(oc get pods -n istio-system -l app=grafana -o jsonpath='{.items[0].metadata.name}')
+
+# Tester la connexion
+oc exec -n istio-system $GRAFANA_POD -- curl -s http://tempo-tempo.istio-system.svc.cluster.local:3200/status
+```
+
+Si la connexion fonctionne, vous devriez voir une réponse JSON.
+
+**3. Vérifier la configuration de la datasource** :
+```bash
+oc get configmap grafana-datasources -n istio-system -o yaml
+```
+
+**4. Redémarrer Grafana** :
+```bash
+oc rollout restart deployment grafana -n istio-system
+oc rollout status deployment grafana -n istio-system
+```
+
+**5. Dans Grafana UI, vérifier la datasource**:
+- Aller dans **Configuration** → **Data Sources**
+- Cliquer sur **Tempo**
+- Cliquer sur **Save & Test**
+- Vous devriez voir "Data source is working"
+
+### Erreur "invalid TraceQL query: parse error"
+
+Si vous voyez cette erreur dans Grafana:
+
+**Cause**: Configuration incompatible de la datasource Tempo
+
+**Solution**:
+```bash
+# Mettre à jour la configuration
+oc apply -f tracing/manifests/grafana.yaml
+
+# Redémarrer Grafana pour recharger la config
+oc rollout restart deployment grafana -n istio-system
+
+# Attendre que Grafana redémarre
+oc rollout status deployment grafana -n istio-system
+```
+
+**Dans Grafana UI**:
+1. **Explore** → Sélectionner **Tempo**
+2. Dans le champ de recherche, cliquer sur **Search** (au lieu de TraceQL)
+3. Utiliser les filtres de recherche (Service Name, Span Name, etc.)
+4. Cliquer sur **Run Query**
+
+**Alternative - Requête TraceQL simple**:
+Si vous voulez utiliser TraceQL, commencez avec une requête simple:
+```
+{}
+```
+
+Puis ajoutez des filtres progressivement:
+```
+{ span.service.name = "productpage.bookinfo" }
 ```
 
 ### Les spans ne contiennent pas assez d'informations
@@ -497,7 +662,7 @@ meshConfig:
 
 **Réduire le sampling** :
 ```bash
-kubectl patch telemetry mesh-tracing -n istio-system --type merge -p '
+oc patch telemetry mesh-tracing -n istio-system --type merge -p '
 spec:
   tracing:
   - randomSamplingPercentage: 10.0
@@ -538,8 +703,8 @@ Conserve :
 ### Désactiver le tracing sans supprimer l'infrastructure
 
 ```bash
-kubectl delete telemetry mesh-tracing -n istio-system
-kubectl delete telemetry bookinfo-tracing -n bookinfo
+oc delete telemetry mesh-tracing -n istio-system
+oc delete telemetry bookinfo-tracing -n bookinfo
 ```
 
 Les composants restent déployés mais ne reçoivent plus de traces.

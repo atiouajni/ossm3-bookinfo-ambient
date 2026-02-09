@@ -35,19 +35,19 @@ data:
 
     exporters:
       otlp:
-        endpoint: tempo.istio-system.svc.cluster.local:4317
+        endpoint: tempo-tempo.istio-system.svc.cluster.local:4317
         tls:
           insecure: true
 
-      logging:
-        loglevel: debug
+      debug:
+        verbosity: detailed
 
     service:
       pipelines:
         traces:
           receivers: [otlp]
           processors: [memory_limiter, batch, resource]
-          exporters: [otlp, logging]
+          exporters: [otlp, debug]
 ---
 apiVersion: v1
 kind: ServiceAccount

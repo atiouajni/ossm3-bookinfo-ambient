@@ -10,22 +10,18 @@ data:
     - name: Tempo
       type: tempo
       access: proxy
-      url: http://tempo.istio-system.svc.cluster.local:3200
+      url: http://tempo-tempo.istio-system.svc.cluster.local:3200
       uid: tempo
       isDefault: false
       editable: true
       jsonData:
         httpMethod: GET
-        serviceMap:
-          datasourceUid: prometheus
-        tracesToLogs:
-          datasourceUid: loki
-        tracesToMetrics:
-          datasourceUid: prometheus
-        search:
-          hide: false
         nodeGraph:
           enabled: true
+        tracesToMetrics:
+          datasourceUid: prometheus
+        serviceMap:
+          datasourceUid: prometheus
 
     - name: Prometheus
       type: prometheus
@@ -95,7 +91,7 @@ spec:
         - name: GF_AUTH_BASIC_ENABLED
           value: "false"
         - name: GF_FEATURE_TOGGLES_ENABLE
-          value: "traceqlEditor"
+          value: "traceqlEditor,traceqlSearch"
         volumeMounts:
         - name: datasources
           mountPath: /etc/grafana/provisioning/datasources
