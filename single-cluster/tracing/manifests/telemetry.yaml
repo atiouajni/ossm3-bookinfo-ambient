@@ -1,0 +1,38 @@
+apiVersion: telemetry.istio.io/v1alpha1
+kind: Telemetry
+metadata:
+  name: mesh-tracing
+  namespace: istio-system
+spec:
+  # Configuration globale du tracing pour tout le mesh
+  tracing:
+  - providers:
+    - name: otel-collector
+    # 100% sampling pour la démo - réduire en production
+    randomSamplingPercentage: 100.0
+    customTags:
+      cluster:
+        literal:
+          value: "mesh1"
+      mesh:
+        literal:
+          value: "istio-ambient"
+---
+apiVersion: telemetry.istio.io/v1alpha1
+kind: Telemetry
+metadata:
+  name: bookinfo-tracing
+  namespace: bookinfo
+spec:
+  # Configuration spécifique au namespace bookinfo
+  tracing:
+  - providers:
+    - name: otel-collector
+    randomSamplingPercentage: 100.0
+    customTags:
+      app_namespace:
+        literal:
+          value: "bookinfo"
+      service_mesh_mode:
+        literal:
+          value: "ambient"

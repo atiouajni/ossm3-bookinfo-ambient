@@ -10,6 +10,28 @@ Déploiement simple de l'application Bookinfo sur un seul cluster OpenShift avec
 
 **Note sur Gateway API**: Les CRDs Gateway API peuvent être pré-installés selon votre version d'OpenShift. Le script de déploiement les installera automatiquement uniquement s'ils ne sont pas déjà présents.
 
+**⚠️ Important - Version Istio**: Cette démo est configurée pour Istio **v1.27.3**. Si votre environnement utilise une version différente, vous devez mettre à jour les fichiers suivants avant le déploiement:
+- `manifests/istio.yaml`
+- `manifests/istio-cni.yaml`
+- `manifests/ztunnel.yaml`
+- `tracing/manifests/istio-tracing-config.yaml` (si vous utilisez le tracing)
+
+Pour vérifier la version disponible sur votre cluster:
+```bash
+oc get istiorevisions -n istio-system
+```
+
+### Changement de version Istio
+
+Un script utilitaire est fourni pour faciliter le changement de version:
+
+```bash
+cd single-cluster/scripts
+./update-istio-version.sh v1.28.0
+```
+
+Ce script met automatiquement à jour tous les fichiers de configuration avec la nouvelle version.
+
 ## Installation Service Mesh Operator
 
 Via la console OpenShift :
@@ -693,6 +715,7 @@ single-cluster/
 │       └── authz-deny-reviews.yaml  # AuthorizationPolicy (sécurité)
 ├── scripts/
 │   ├── check-prerequisites.sh  # Vérification des prérequis
+│   ├── update-istio-version.sh # Mise à jour de la version Istio
 │   ├── deploy-all.sh           # Déploiement complet (Istio + Bookinfo + Kiali)
 │   ├── deploy-istio.sh         # Déploiement Istio infrastructure L4
 │   ├── deploy-waypoint.sh      # Déploiement Waypoint (Istio L7) pour un namespace

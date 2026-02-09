@@ -1,0 +1,29 @@
+apiVersion: sailoperator.io/v1
+kind: Istio
+metadata:
+  name: default
+spec:
+  version: v1.27.3
+  namespace: istio-system
+  profile: ambient
+  values:
+    global:
+      meshID: mesh1
+    pilot:
+      trustedZtunnelNamespace: ztunnel
+    meshConfig:
+      # Active le tracing dans le mesh
+      enableTracing: true
+      defaultConfig:
+        tracing:
+          sampling: 100.0
+          max_path_tag_length: 256
+      # Configuration des providers de télémétrie
+      extensionProviders:
+      - name: otel-collector
+        opentelemetry:
+          service: otel-collector.istio-system.svc.cluster.local
+          port: 4317
+          # Context propagation pour compatibilité
+          resource_detectors:
+            environment: {}

@@ -1,0 +1,129 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: grafana-datasources
+  namespace: istio-system
+data:
+  datasources.yaml: |
+    apiVersion: 1
+    datasources:
+    - name: Tempo
+      type: tempo
+      access: proxy
+      url: http://tempo.istio-system.svc.cluster.local:3200
+      uid: tempo
+      isDefault: false
+      editable: true
+      jsonData:
+        httpMethod: GET
+        serviceMap:
+          datasourceUid: prometheus
+        tracesToLogs:
+          datasourceUid: loki
+        tracesToMetrics:
+          datasourceUid: prometheus
+        search:
+          hide: false
+        nodeGraph:
+          enabled: true
+
+    - name: Prometheus
+      type: prometheus
+      access: proxy
+      url: http://prometheus.istio-system.svc.cluster.local:9090
+      uid: prometheus
+      isDefault: true
+      editable: true
+      jsonData:
+        httpMethod: POST
+        exemplarTraceIdDestinations:
+        - name: traceID
+          datasourceUid: tempo
+---
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: grafana
+  namespace: istio-system
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: grafana
+  namespace: istio-system
+  labels:
+    app: grafana
+spec:
+  selector:
+    app: grafana
+  ports:
+  - name: http
+    port: 3000
+    targetPort: 3000
+    protocol: TCP
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: grafana
+  namespace: istio-system
+  labels:
+    app: grafana
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: grafana
+  template:
+    metadata:
+      labels:
+        app: grafana
+    spec:
+      serviceAccountName: grafana
+      containers:
+      - name: grafana
+        image: grafana/grafana:latest
+        ports:
+        - name: http
+          containerPort: 3000
+          protocol: TCP
+        env:
+        - name: GF_AUTH_ANONYMOUS_ENABLED
+          value: "true"
+        - name: GF_AUTH_ANONYMOUS_ORG_ROLE
+          value: "Admin"
+        - name: GF_AUTH_BASIC_ENABLED
+          value: "false"
+        - name: GF_FEATURE_TOGGLES_ENABLE
+          value: "traceqlEditor"
+        volumeMounts:
+        - name: datasources
+          mountPath: /etc/grafana/provisioning/datasources
+        resources:
+          requests:
+            memory: "256Mi"
+            cpu: "100m"
+          limits:
+            memory: "512Mi"
+            cpu: "500m"
+      volumes:
+      - name: datasources
+        configMap:
+          name: grafana-datasources
+---
+apiVersion: route.openshift.io/v1
+kind: Route
+metadata:
+  name: grafana
+  namespace: istio-system
+  labels:
+    app: grafana
+spec:
+  to:
+    kind: Service
+    name: grafana
+  port:
+    targetPort: http
+  tls:
+    termination: edge
+    insecureEdgeTerminationPolicy: Redirect
