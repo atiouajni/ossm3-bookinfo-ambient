@@ -11,9 +11,8 @@ echo "=========================================="
 echo
 
 echo "⚠️  Cette action va supprimer:"
-echo "   - Grafana Tempo et ses données"
+echo "   - Grafana Tempo (avec Jaeger UI) et ses données"
 echo "   - OpenTelemetry Collector"
-echo "   - Grafana (tracing)"
 echo "   - Configuration de tracing Istio"
 echo "   - Ressources Telemetry"
 echo
@@ -35,14 +34,14 @@ echo
 
 # Supprimer les ressources Telemetry
 echo "🗑️  [1/5] Suppression des ressources Telemetry..."
-kubectl delete telemetry mesh-tracing -n istio-system --ignore-not-found=true
-kubectl delete telemetry bookinfo-tracing -n bookinfo --ignore-not-found=true
+oc delete telemetry mesh-tracing -n istio-system --ignore-not-found=true
+oc delete telemetry bookinfo-tracing -n bookinfo --ignore-not-found=true
 echo "✅ Telemetry supprimé"
 echo
 
 # Restaurer la configuration Istio sans tracing
 echo "⚙️  [2/5] Restauration de la configuration Istio..."
-cat <<EOF | kubectl apply -f -
+cat <<EOF | oc apply -f -
 apiVersion: sailoperator.io/v1
 kind: Istio
 metadata:
@@ -59,27 +58,29 @@ spec:
 EOF
 
 echo "⏳ Attente du redémarrage d'istiod..."
-kubectl rollout status deployment/istiod -n istio-system --timeout=120s || true
+oc rollout status deployment/istiod -n istio-system --timeout=120s || true
 sleep 10
 echo "✅ Configuration Istio restaurée"
 echo
 
-# Supprimer Grafana
-echo "🗑️  [3/5] Suppression de Grafana..."
-kubectl delete -f "${MANIFESTS_DIR}/grafana.yaml" --ignore-not-found=true
-echo "✅ Grafana supprimé"
-echo
-
 # Supprimer OpenTelemetry Collector
-echo "🗑️  [4/5] Suppression de OpenTelemetry Collector..."
-kubectl delete -f "${MANIFESTS_DIR}/otel-collector.yaml" --ignore-not-found=true
+echo "🗑️  [3/5] Suppression de OpenTelemetry Collector..."
+oc delete -f "${MANIFESTS_DIR}/otel-collector.yaml" --ignore-not-found=true
 echo "✅ OpenTelemetry Collector supprimé"
 echo
 
-# Supprimer Tempo
-echo "🗑️  [5/5] Suppression de Grafana Tempo..."
-kubectl delete -f "${MANIFESTS_DIR}/tempo.yaml" --ignore-not-found=true
-echo "✅ Tempo supprimé"
+# Supprimer la route Jaeger sans OAuth
+echo "🗑️  [4/5] Suppression de la route Jaeger UI..."
+oc delete route jaeger-query -n istio-system --ignore-not-found=true
+echo "✅ Route Jaeger supprimée"
+echo
+
+# Supprimer Tempo (TempoMonolithic CR avec Jaeger UI)
+echo "🗑️  [5/5] Suppression de Grafana Tempo (avec Jaeger UI)..."
+oc delete tempomonolithic tempo -n istio-system --ignore-not-found=true
+# Attendre que l'opérateur nettoie les ressources (y compris Jaeger UI route)
+sleep 5
+echo "✅ Tempo et Jaeger UI supprimés"
 echo
 
 # Vérification finale
@@ -91,15 +92,19 @@ echo
 echo "📊 Vérification des ressources restantes:"
 echo
 echo "Pods dans istio-system:"
-kubectl get pods -n istio-system | grep -E '(tempo|otel|grafana)' && echo "⚠️  Certains pods existent encore (en cours de suppression)" || echo "✅ Aucun pod de tracing trouvé"
+oc get pods -n istio-system | grep -E '(tempo|otel)' && echo "⚠️  Certains pods existent encore (en cours de suppression)" || echo "✅ Aucun pod de tracing trouvé"
 echo
 
 echo "Services dans istio-system:"
-kubectl get svc -n istio-system | grep -E '(tempo|otel|grafana)' && echo "⚠️  Certains services existent encore" || echo "✅ Aucun service de tracing trouvé"
+oc get svc -n istio-system | grep -E '(tempo|otel)' && echo "⚠️  Certains services existent encore" || echo "✅ Aucun service de tracing trouvé"
+echo
+
+echo "Routes dans istio-system:"
+oc get route -n istio-system | grep -E '(tempo|jaeger)' && echo "⚠️  Certaines routes existent encore" || echo "✅ Aucune route de tracing trouvée"
 echo
 
 echo "Telemetry resources:"
-kubectl get telemetry -A 2>/dev/null | grep -E '(mesh-tracing|bookinfo-tracing)' && echo "⚠️  Certaines ressources Telemetry existent encore" || echo "✅ Aucune ressource Telemetry trouvée"
+oc get telemetry -A 2>/dev/null | grep -E '(mesh-tracing|bookinfo-tracing)' && echo "⚠️  Certaines ressources Telemetry existent encore" || echo "✅ Aucune ressource Telemetry trouvée"
 echo
 
 echo "📝 État du système:"

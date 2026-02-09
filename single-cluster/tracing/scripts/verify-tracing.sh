@@ -18,12 +18,24 @@ check_pod() {
     local namespace=${2:-istio-system}
 
     echo -n "📦 Checking $app pod in $namespace... "
-    if kubectl get pods -n "$namespace" -l "app=$app" -o jsonpath='{.items[0].status.phase}' 2>/dev/null | grep -q "Running"; then
-        echo -e "${GREEN}✅ Running${NC}"
-        return 0
+
+    # Pour Tempo, vérifier le StatefulSet pod
+    if [ "$app" = "tempo" ]; then
+        if oc get pod tempo-tempo-0 -n "$namespace" -o jsonpath='{.status.phase}' 2>/dev/null | grep -q "Running"; then
+            echo -e "${GREEN}✅ Running${NC}"
+            return 0
+        else
+            echo -e "${RED}❌ Not Running${NC}"
+            return 1
+        fi
     else
-        echo -e "${RED}❌ Not Running${NC}"
-        return 1
+        if oc get pods -n "$namespace" -l "app=$app" -o jsonpath='{.items[0].status.phase}' 2>/dev/null | grep -q "Running"; then
+            echo -e "${GREEN}✅ Running${NC}"
+            return 0
+        else
+            echo -e "${RED}❌ Not Running${NC}"
+            return 1
+        fi
     fi
 }
 
@@ -32,12 +44,24 @@ check_service() {
     local namespace=${2:-istio-system}
 
     echo -n "🔌 Checking service $name in $namespace... "
-    if kubectl get svc "$name" -n "$namespace" &> /dev/null; then
-        echo -e "${GREEN}✅ Exists${NC}"
-        return 0
+
+    # Pour Tempo, vérifier le service créé par l'opérateur
+    if [ "$name" = "tempo" ]; then
+        if oc get svc tempo-tempo -n "$namespace" &> /dev/null; then
+            echo -e "${GREEN}✅ Exists (tempo-tempo)${NC}"
+            return 0
+        else
+            echo -e "${RED}❌ Not Found${NC}"
+            return 1
+        fi
     else
-        echo -e "${RED}❌ Not Found${NC}"
-        return 1
+        if oc get svc "$name" -n "$namespace" &> /dev/null; then
+            echo -e "${GREEN}✅ Exists${NC}"
+            return 0
+        else
+            echo -e "${RED}❌ Not Found${NC}"
+            return 1
+        fi
     fi
 }
 
@@ -46,7 +70,7 @@ check_telemetry() {
     local namespace=$2
 
     echo -n "📡 Checking Telemetry $name in $namespace... "
-    if kubectl get telemetry "$name" -n "$namespace" &> /dev/null; then
+    if oc get telemetry "$name" -n "$namespace" &> /dev/null; then
         echo -e "${GREEN}✅ Configured${NC}"
         return 0
     else
@@ -55,34 +79,47 @@ check_telemetry() {
     fi
 }
 
-echo "🔍 [1/4] Vérification des pods..."
+echo "🔍 [1/5] Vérification de la CR TempoMonolithic..."
+echo
+echo -n "📡 Checking TempoMonolithic CR... "
+if oc get tempomonolithic tempo -n istio-system &> /dev/null; then
+    STATUS=$(oc get tempomonolithic tempo -n istio-system -o jsonpath='{.status.conditions[?(@.type=="Ready")].status}' 2>/dev/null || echo "Unknown")
+    if [ "$STATUS" = "True" ]; then
+        echo -e "${GREEN}✅ Ready${NC}"
+    else
+        echo -e "${YELLOW}⚠️  Status: $STATUS${NC}"
+    fi
+else
+    echo -e "${RED}❌ Not Found${NC}"
+fi
+echo
+
+echo "🔍 [2/5] Vérification des pods..."
 echo
 check_pod "tempo"
 check_pod "otel-collector"
-check_pod "grafana"
 echo
 
-echo "🔍 [2/4] Vérification des services..."
+echo "🔍 [3/5] Vérification des services..."
 echo
 check_service "tempo"
 check_service "otel-collector"
-check_service "grafana"
 echo
 
-echo "🔍 [3/4] Vérification de la configuration Telemetry..."
+echo "🔍 [4/5] Vérification de la configuration Telemetry..."
 echo
 check_telemetry "mesh-tracing" "istio-system"
 check_telemetry "bookinfo-tracing" "bookinfo" || echo -e "   ${YELLOW}⚠️  Optionnel - seulement si bookinfo est déployé${NC}"
 echo
 
-echo "🔍 [4/4] Vérification de la configuration Istio..."
+echo "🔍 [5/5] Vérification de la configuration Istio..."
 echo
 echo -n "⚙️  Checking Istio tracing configuration... "
-if kubectl get istio default -n istio-system -o yaml | grep -q "enableTracing: true"; then
+if oc get istio default -n istio-system -o yaml | grep -q "enableTracing: true"; then
     echo -e "${GREEN}✅ Enabled${NC}"
 else
     echo -e "${RED}❌ Not Enabled${NC}"
-    echo -e "   ${YELLOW}Appliquer: kubectl apply -f tracing/manifests/istio-tracing-config.yaml${NC}"
+    echo -e "   ${YELLOW}Appliquer: oc apply -f tracing/manifests/istio-tracing-config.yaml${NC}"
 fi
 echo
 
@@ -93,7 +130,7 @@ echo "=========================================="
 echo
 
 echo "🔌 Test OTLP endpoint (OpenTelemetry Collector)..."
-if kubectl run test-otel --image=curlimages/curl --rm -i --restart=Never --timeout=10s -- \
+if oc run test-otel --image=curlimages/curl --rm -i --restart=Never --timeout=10s -- \
     curl -s -o /dev/null -w "%{http_code}" http://otel-collector.istio-system.svc.cluster.local:4318/v1/traces 2>/dev/null | grep -q "405\|200"; then
     echo -e "${GREEN}✅ OpenTelemetry Collector reachable${NC}"
 else
@@ -102,20 +139,22 @@ fi
 echo
 
 echo "🔌 Test Tempo API endpoint..."
-if kubectl run test-tempo --image=curlimages/curl --rm -i --restart=Never --timeout=10s -- \
-    curl -s http://tempo.istio-system.svc.cluster.local:3200/ready 2>/dev/null | grep -q "ready"; then
+if oc run test-tempo --image=curlimages/curl --rm -i --restart=Never --timeout=10s -- \
+    curl -s http://tempo-tempo.istio-system.svc.cluster.local:3200/ready 2>/dev/null | grep -q "ready"; then
     echo -e "${GREEN}✅ Tempo API ready${NC}"
 else
     echo -e "${YELLOW}⚠️  Tempo API not ready (may need more time)${NC}"
 fi
 echo
 
-echo "🔌 Test Grafana endpoint..."
-if kubectl run test-grafana --image=curlimages/curl --rm -i --restart=Never --timeout=10s -- \
-    curl -s -o /dev/null -w "%{http_code}" http://grafana.istio-system.svc.cluster.local:3000/api/health 2>/dev/null | grep -q "200"; then
-    echo -e "${GREEN}✅ Grafana reachable${NC}"
+echo "🔌 Test Jaeger UI route (sans OAuth)..."
+JAEGER_ROUTE=$(oc get route jaeger-query -n istio-system -o jsonpath='{.spec.host}' 2>/dev/null || echo "")
+if [ -n "$JAEGER_ROUTE" ]; then
+    echo -e "${GREEN}✅ Jaeger UI route exists (sans OAuth)${NC}"
+    echo "   URL: https://${JAEGER_ROUTE}"
 else
-    echo -e "${RED}❌ Grafana not reachable${NC}"
+    echo -e "${YELLOW}⚠️  Route jaeger-query non trouvée${NC}"
+    echo "   Vérifier: oc get route jaeger-query -n istio-system"
 fi
 echo
 
@@ -130,7 +169,7 @@ echo "   (Assurez-vous d'avoir généré du trafic d'abord)"
 echo
 
 # Port-forward temporaire pour tester
-kubectl port-forward -n istio-system svc/tempo 3200:3200 > /dev/null 2>&1 &
+oc port-forward -n istio-system svc/tempo-tempo 3200:3200 > /dev/null 2>&1 &
 PF_PID=$!
 sleep 3
 
@@ -143,7 +182,7 @@ if [ -n "$SERVICES" ]; then
     echo -e "${GREEN}✅ Traces trouvées dans Tempo${NC}"
     echo
     echo "   Pour voir les détails:"
-    echo "   kubectl port-forward -n istio-system svc/tempo 3200:3200"
+    echo "   oc port-forward -n istio-system svc/tempo-tempo 3200:3200"
     echo "   curl http://localhost:3200/api/search/tags | jq"
 else
     echo -e "${YELLOW}⚠️  Aucune trace trouvée${NC}"
@@ -159,19 +198,21 @@ echo "  🌐 URLs d'accès"
 echo "=========================================="
 echo
 
-GRAFANA_ROUTE=$(kubectl get route grafana -n istio-system -o jsonpath='{.spec.host}' 2>/dev/null || echo "")
+JAEGER_ROUTE=$(oc get route jaeger-query -n istio-system -o jsonpath='{.spec.host}' 2>/dev/null || echo "")
 
-if [ -n "$GRAFANA_ROUTE" ]; then
-    echo "Grafana:"
-    echo "  https://${GRAFANA_ROUTE}"
+if [ -n "$JAEGER_ROUTE" ]; then
+    echo "Jaeger UI (sans OAuth):"
+    echo "  https://${JAEGER_ROUTE}"
     echo
     echo "Pour explorer les traces:"
-    echo "  1. Ouvrir Grafana"
-    echo "  2. Explore → Tempo"
-    echo "  3. Service Name: productpage.bookinfo"
-    echo "  4. Run Query"
+    echo "  1. Ouvrir Jaeger UI dans le navigateur (pas d'authentification requise)"
+    echo "  2. Search → Service: productpage.bookinfo"
+    echo "  3. Cliquer sur Find Traces"
+    echo "  4. Cliquer sur une trace pour voir les détails"
 else
-    echo -e "${YELLOW}⚠️  Route Grafana non trouvée${NC}"
+    echo -e "${YELLOW}⚠️  Route Jaeger UI non trouvée${NC}"
+    echo "  Vérifier: oc get route jaeger-query -n istio-system"
+    echo "  Redéployer: cd tracing/scripts && ./deploy-tracing.sh"
 fi
 echo
 
@@ -183,13 +224,10 @@ echo
 
 ALL_OK=true
 
-if ! kubectl get pods -n istio-system -l app=tempo -o jsonpath='{.items[0].status.phase}' 2>/dev/null | grep -q "Running"; then
+if ! oc get pod tempo-tempo-0 -n istio-system -o jsonpath='{.status.phase}' 2>/dev/null | grep -q "Running"; then
     ALL_OK=false
 fi
-if ! kubectl get pods -n istio-system -l app=otel-collector -o jsonpath='{.items[0].status.phase}' 2>/dev/null | grep -q "Running"; then
-    ALL_OK=false
-fi
-if ! kubectl get pods -n istio-system -l app=grafana -o jsonpath='{.items[0].status.phase}' 2>/dev/null | grep -q "Running"; then
+if ! oc get pods -n istio-system -l app=otel-collector -o jsonpath='{.items[0].status.phase}' 2>/dev/null | grep -q "Running"; then
     ALL_OK=false
 fi
 
@@ -204,8 +242,8 @@ else
     echo -e "${RED}❌ Certains composants ne sont pas opérationnels${NC}"
     echo
     echo "📝 Actions recommandées:"
-    echo "   1. Vérifier les logs: kubectl logs -n istio-system -l app=tempo"
-    echo "   2. Vérifier les logs: kubectl logs -n istio-system -l app=otel-collector"
+    echo "   1. Vérifier les logs: oc logs -n istio-system -l app=tempo"
+    echo "   2. Vérifier les logs: oc logs -n istio-system -l app=otel-collector"
     echo "   3. Redéployer si nécessaire: ./deploy-tracing.sh"
 fi
 echo
