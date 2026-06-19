@@ -1,15 +1,18 @@
 # Route all traffic to reviews v3 (red stars)
-apiVersion: networking.istio.io/v1
-kind: VirtualService
+# Based on: https://github.com/openshift-service-mesh/istio/tree/master/samples/bookinfo/gateway-api
+
+apiVersion: gateway.networking.k8s.io/v1
+kind: HTTPRoute
 metadata:
   name: reviews
   namespace: bookinfo
 spec:
-  hosts:
-  - reviews
-  http:
-  - route:
-    - destination:
-        host: reviews
-        subset: v3
-      weight: 100
+  parentRefs:
+    - group: ""
+      kind: Service
+      name: reviews
+      port: 9080
+  rules:
+    - backendRefs:
+        - name: reviews-v3
+          port: 9080

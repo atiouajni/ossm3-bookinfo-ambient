@@ -1,0 +1,80 @@
+---
+# NetworkPolicy for Istio Ambient Mode
+# Allows traffic from ztunnel, waypoint, and within namespace
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: allow-ambient-mesh-traffic
+  namespace: bookinfo
+spec:
+  podSelector: {}
+  policyTypes:
+    - Ingress
+    - Egress
+
+  ingress:
+    # Allow traffic from ztunnel namespace (ambient L4 proxy)
+    - from:
+        - namespaceSelector:
+            matchLabels:
+              kubernetes.io/metadata.name: ztunnel
+
+    # Allow traffic from waypoint in same namespace (L7 proxy)
+    - from:
+        - podSelector:
+            matchLabels:
+              gateway.networking.k8s.io/gateway-name: waypoint
+
+    # Allow traffic from istio-system (ingress gateway)
+    - from:
+        - namespaceSelector:
+            matchLabels:
+              kubernetes.io/metadata.name: istio-system
+
+    # Allow intra-namespace communication
+    - from:
+        - podSelector: {}
+
+    # Allow Kubernetes health checks and metrics
+    - from:
+        - namespaceSelector:
+            matchLabels:
+              name: openshift-monitoring
+      ports:
+        - protocol: TCP
+          port: 15020  # Istio health check port
+
+  egress:
+    # Allow DNS
+    - to:
+        - namespaceSelector:
+            matchLabels:
+              kubernetes.io/metadata.name: openshift-dns
+      ports:
+        - protocol: UDP
+          port: 53
+
+    # Allow traffic to Istio control plane (xDS)
+    - to:
+        - namespaceSelector:
+            matchLabels:
+              kubernetes.io/metadata.name: istio-system
+      ports:
+        - protocol: TCP
+          port: 15012
+
+    # Allow traffic to ztunnel (ambient mode requirement)
+    - to:
+        - namespaceSelector:
+            matchLabels:
+              kubernetes.io/metadata.name: ztunnel
+
+    # Allow intra-namespace communication
+    - to:
+        - podSelector: {}
+
+    # Allow traffic to waypoint
+    - to:
+        - podSelector:
+            matchLabels:
+              gateway.networking.k8s.io/gateway-name: waypoint

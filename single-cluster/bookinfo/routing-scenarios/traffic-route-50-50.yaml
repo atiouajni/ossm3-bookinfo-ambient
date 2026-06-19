@@ -1,4 +1,4 @@
-# Route all traffic to reviews v2 (black stars)
+# Canary deployment: 50% v1, 50% v3
 # Based on: https://github.com/openshift-service-mesh/istio/tree/master/samples/bookinfo/gateway-api
 
 apiVersion: gateway.networking.k8s.io/v1
@@ -14,5 +14,9 @@ spec:
       port: 9080
   rules:
     - backendRefs:
-        - name: reviews-v2
+        - name: reviews-v1
           port: 9080
+          weight: 50
+        - name: reviews-v3
+          port: 9080
+          weight: 50
