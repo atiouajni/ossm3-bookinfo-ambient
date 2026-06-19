@@ -1,254 +1,202 @@
-# Bookinfo sur OpenShift Service Mesh 3 (Ambient Mode)
+# OpenShift Service Mesh 3.3 - Bookinfo Ambient Mode
 
-Déploiement de l'application Bookinfo sur OpenShift avec Istio en mode ambient.
+Automated deployment of Bookinfo application on OpenShift Service Mesh 3.3 using Istio Ambient mode.
 
-## Architecture
+## Blog Post Reference
+Based on: **"Integrating Your Applications Into the Istio Service Mesh"**  
+Author: Anisse Tiouajni | Publication Date: June 6, 2026
 
-- **Mode**: Ambient (sans sidecars, utilise ZTunnel pour L4)
-- **Cluster**: Single cluster OpenShift (SNO ou multi-node)
-- **Mesh ID**: mesh1
-- **Application**: Bookinfo (tous les microservices sur le même cluster)
+## Architecture Overview
 
-## Qu'est-ce que le mode Ambient?
-
-Le **mode ambient** d'Istio est une nouvelle architecture qui simplifie le service mesh:
-
-- ✅ **Pas de sidecars** - Pas d'injection de proxy dans les pods applicatifs
-- ✅ **ZTunnel** - DaemonSet qui gère le trafic L4 (mTLS, connectivité)
-- ✅ **Waypoint** (optionnel) - Pour les fonctionnalités L7 (routing avancé, retries)
-- ✅ **Moins de ressources** - Réduction de la consommation CPU/mémoire
-- ✅ **Déploiement simplifié** - Pas de redémarrage des pods applicatifs
-
-### Architecture déployée
+Ambient mode eliminates sidecars with a two-layer data plane:
 
 ```
-┌─────────────────────────────────────────────────┐
-│           OpenShift Cluster                     │
-│                                                 │
-│  ┌───────────────────────────────────────────┐  │
-│  │  Namespace: istio-system                  │  │
-│  │  - istiod (Control Plane)                 │  │
-│  │  - bookinfo-gateway (Ingress)             │  │
-│  └───────────────────────────────────────────┘  │
-│                                                 │
-│  ┌───────────────────────────────────────────┐  │
-│  │  Namespace: ztunnel                       │  │
-│  │  - ztunnel (DaemonSet - Ambient proxy)    │  │
-│  └───────────────────────────────────────────┘  │
-│                                                 │
-│  ┌───────────────────────────────────────────┐  │
-│  │  Namespace: bookinfo (ambient mode)       │  │
-│  │                                           │  │
-│  │  ┌─────────────┐  ┌─────────────┐        │  │
-│  │  │productpage  │  │  details    │        │  │
-│  │  │  (v1)       │  │   (v1)      │        │  │
-│  │  └─────────────┘  └─────────────┘        │  │
-│  │                                           │  │
-│  │  ┌─────────────┐  ┌─────────────┐        │  │
-│  │  │  reviews    │  │  ratings    │        │  │
-│  │  │ (v1,v2,v3)  │  │   (v1)      │        │  │
-│  │  └─────────────┘  └─────────────┘        │  │
-│  └───────────────────────────────────────────┘  │
-│                                                 │
-│  Route OpenShift:                               │
-│  bookinfo-istio-system.apps.cluster.com        │
-└─────────────────────────────────────────────────┘
+Internet (HTTPS) → OpenShift Router (edge TLS)
+  → Route → Istio Ingress Gateway
+    → HTTPRoute (Gateway API)
+      → Ztunnel (L4: mTLS, identity)
+        → Waypoint (L7: routing, policies)
+          → Application Pods
 ```
 
-## Prérequis
-
-- OpenShift 4.x (SNO ou cluster complet)
-- OpenShift Service Mesh Operator 3.x installé
-- oc CLI
-- Accès cluster-admin
-
-### Installation Service Mesh Operator
-
-Via la console OpenShift :
-1. **Operators** → **OperatorHub**
-2. Rechercher **"OpenShift Service Mesh"**
-3. Cliquer sur **Install**
-4. Sélectionner la version **3.x**
-5. Attendre que le status soit **Succeeded**
+**Components:**
+- **Ztunnel**: Node-level DaemonSet for L4 (mTLS, traffic capture via eBPF)
+- **Waypoint**: Optional L7 proxy for advanced routing (HTTPRoute, VirtualService)
+- **Gateway API**: Kubernetes-native traffic management (HTTPRoute, Gateway)
 
 ## Quick Start
 
-### 1. Vérifier les prérequis
+### Automated Deployment
 
 ```bash
-cd single-cluster/scripts
-./check-prerequisites.sh
+cd single-cluster
+./deploy.sh
 ```
 
-Le script vérifie:
-- ✅ CLI tools (oc/kubectl)
-- ✅ Connexion au cluster
-- ✅ Service Mesh Operator 3.x installé
-- ✅ Permissions cluster-admin
-- ✅ Pas de déploiements conflictuels
+**Deploys in correct order:**
+1. Istio CNI
+2. Istio Control Plane (istiod)
+3. Ztunnel (L4 proxy)
+4. Bookinfo Application
+5. Ambient mode enrollment
+6. Waypoint Gateway (L7 proxy)
+7. Istio Ingress Gateway
+8. OpenShift Route (edge TLS with HTTP→HTTPS redirect)
+9. HTTPRoute (ingress routing)
+10. Network Policies
 
-### 2. Déployer Bookinfo
+**Access URL**: `https://mesh-ingress-{namespace}.apps.{cluster-domain}/productpage`
+
+### Testing
 
 ```bash
-./deploy-all.sh
+# Test routing distribution
+./test-routing.sh
+
+# Verify ambient mode
+oc get ns bookinfo --show-labels | grep ambient
+oc get gateway waypoint -n bookinfo
+oc get httproute -n bookinfo
 ```
 
-Le script va :
-1. ✅ Créer les namespaces (istio-system, istio-cni, ztunnel, bookinfo)
-2. ✅ Vérifier/Installer Gateway API CRDs
-3. ✅ Déployer Istio CNI
-4. ✅ Déployer Istio Control Plane (mode ambient)
-5. ✅ Déployer ZTunnel
-6. ✅ Déployer l'application Bookinfo (tous les services)
-7. ✅ Créer la Route OpenShift pour accès externe
-
-**Durée** : ~5 minutes
-
-### 3. Accéder à l'application
-
-L'URL sera affichée à la fin du déploiement:
-
-```
-https://bookinfo-istio-system.apps.your-cluster.com/productpage
-```
-
-Ou récupérer manuellement:
+### Apply Routing Scenarios
 
 ```bash
-oc get route bookinfo -n istio-system -o jsonpath='{.spec.host}'
+# Route all traffic to v1 (no stars)
+oc apply -f bookinfo/routing-scenarios/reviews-v1-only.yaml
+
+# Route to v2 (black stars)
+oc apply -f bookinfo/routing-scenarios/reviews-v2-only.yaml
+
+# Route to v3 (red stars)
+oc apply -f bookinfo/routing-scenarios/reviews-v3-only.yaml
 ```
 
-## Services Bookinfo
-
-L'application complète est déployée:
-
-| Service | Version(s) | Description |
-|---------|-----------|-------------|
-| **productpage** | v1 | Page principale de l'application |
-| **details** | v1 | Détails du livre |
-| **reviews** | v1, v2, v3 | Avis des lecteurs (v2 et v3 avec étoiles) |
-| **ratings** | v1 | Système de notation |
-
-## Fonctionnalités testables
-
-### 1. Load balancing entre versions
-
-Rechargez plusieurs fois la page `/productpage`:
-- Parfois sans étoiles (reviews v1)
-- Parfois avec étoiles noires (reviews v2)
-- Parfois avec étoiles rouges (reviews v3)
-
-### 2. mTLS automatique
-
-En mode ambient, toutes les communications sont automatiquement chiffrées en mTLS sans configuration.
-
-### 3. Observabilité
-
-Générer du trafic:
+### Cleanup
 
 ```bash
-for i in {1..100}; do
-  curl -s https://$(oc get route bookinfo -n istio-system -o jsonpath='{.spec.host}')/productpage > /dev/null
-  echo "Request $i"
-done
-```
-
-## Vérification
-
-```bash
-# Vérifier les pods Istio
-oc get pods -n istio-system
-oc get pods -n ztunnel
-
-# Vérifier les pods Bookinfo
-oc get pods -n bookinfo
-
-# Vérifier les services
-oc get svc -n bookinfo
-
-# Tester l'application
-curl https://$(oc get route bookinfo -n istio-system -o jsonpath='{.spec.host}')/productpage
-```
-
-## Nettoyage
-
-Pour supprimer complètement Bookinfo et Istio:
-
-```bash
-cd single-cluster/scripts
 ./cleanup.sh
+```
+
+## Manual Deployment
+
+### Prerequisites
+- OpenShift 4.x cluster
+- OpenShift Service Mesh 3.3 Operator installed
+- `oc` CLI configured
+
+### Steps
+
+```bash
+# 1. Deploy Istio CNI (must be first)
+oc create namespace istio-cni
+oc apply -f manifests/istio-cni.yaml
+
+# 2. Deploy Control Plane
+oc create namespace istio-system
+oc apply -f manifests/istio.yaml
+
+# 3. Deploy Ztunnel (L4 proxy)
+oc create namespace ztunnel
+oc apply -f manifests/ztunnel.yaml
+
+# 4. Deploy Bookinfo
+oc create namespace bookinfo
+oc apply -f bookinfo/bookinfo.yaml -n bookinfo
+oc apply -f bookinfo/bookinfo-versions.yaml -n bookinfo
+
+# 5. Enable Ambient mode
+oc label namespace bookinfo istio.io/dataplane-mode=ambient
+oc label namespace bookinfo istio.io/use-waypoint=waypoint
+
+# 6. Deploy Waypoint (L7 proxy)
+oc apply -f manifests/waypoint.yaml
+
+# 7. Deploy Ingress Gateway
+oc apply -f manifests/istio-ingress.yaml
+oc annotate gateway istio-ingress -n istio-system \
+  networking.istio.io/service-type=ClusterIP --overwrite
+
+# 8. Create OpenShift Route (edge TLS)
+oc create route edge mesh-ingress \
+  --service=istio-ingress-istio \
+  --port=http \
+  --insecure-policy=Redirect \
+  -n istio-system
+
+# 9. Configure Ingress Routing
+oc apply -f manifests/ingress-routing.yaml
+
+# 10. Apply Network Policies
+oc apply -f manifests/network-policy-lockdown.yaml
+```
+
+## Key Features
+
+### HTTPRoute for L7 Routing
+Uses Kubernetes Gateway API instead of Istio VirtualService:
+
+```yaml
+apiVersion: gateway.networking.k8s.io/v1
+kind: HTTPRoute
+metadata:
+  name: reviews
+  namespace: bookinfo
+spec:
+  parentRefs:
+  - kind: Service
+    name: reviews
+    port: 9080
+  rules:
+  - backendRefs:
+    - name: reviews-v1
+      port: 9080
+      weight: 90
+    - name: reviews-v2
+      port: 9080
+      weight: 10
+```
+
+### Ambient-Compatible Network Policy
+Allows traffic from ztunnel, waypoint, and within namespace:
+
+```yaml
+ingress:
+  - from:
+    - namespaceSelector:
+        matchLabels:
+          kubernetes.io/metadata.name: ztunnel
+  - from:
+    - podSelector:
+        matchLabels:
+          gateway.networking.k8s.io/gateway-name: waypoint
+```
+
+### OpenShift Route with Edge TLS
+Terminates TLS at router, redirects HTTP→HTTPS:
+
+```bash
+oc create route edge mesh-ingress \
+  --service=istio-ingress-istio \
+  --port=http \
+  --insecure-policy=Redirect \
+  -n istio-system
 ```
 
 ## Troubleshooting
 
-### Les pods ne démarrent pas
-
-**Problème**: Erreur de permissions OpenShift SCC
-
 ```bash
-# Accorder les permissions manuellement
-oc adm policy add-scc-to-user anyuid -z bookinfo-productpage -n bookinfo
-oc adm policy add-scc-to-user anyuid -z bookinfo-details -n bookinfo
-oc adm policy add-scc-to-user anyuid -z bookinfo-reviews -n bookinfo
-oc adm policy add-scc-to-user anyuid -z bookinfo-ratings -n bookinfo
+# Check all components
+oc get pods -n istio-cni
+oc get pods -n istio-system
+oc get daemonset -n ztunnel
+oc get pods -n bookinfo
+
+# Check routing
+oc get gateway -A
+oc get httproute -A
+oc describe httproute bookinfo-ingress -n bookinfo
+
+# Test connectivity
+curl -I https://mesh-ingress-istio-system.apps.{cluster}/productpage
 ```
-
-### La Route ne fonctionne pas
-
-**Vérifier**:
-
-```bash
-# Status de la Route
-oc get route bookinfo -n istio-system
-
-# Status du service Gateway
-oc get svc -n istio-system | grep bookinfo-gateway
-
-# Logs du Gateway
-oc logs -n istio-system -l gateway.networking.k8s.io/gateway-name=bookinfo-gateway
-```
-
-### istiod ne démarre pas
-
-**Vérifier les logs**:
-
-```bash
-oc logs -n istio-system -l app=istiod --tail=50
-```
-
-## Structure du projet
-
-```
-ossm3-bookinfo-ambient/
-├── single-cluster/           # Déploiement single-cluster (cette démo)
-│   ├── manifests/
-│   │   ├── istio-cni.yaml
-│   │   ├── istio.yaml
-│   │   ├── ztunnel.yaml
-│   │   └── gatewayclass.yaml
-│   ├── bookinfo/
-│   │   ├── namespace.yaml
-│   │   ├── serviceaccounts.yaml
-│   │   ├── bookinfo.yaml
-│   │   └── gateway.yaml
-│   ├── scripts/
-│   │   ├── check-prerequisites.sh
-│   │   ├── deploy-all.sh
-│   │   └── cleanup.sh
-│   └── README.md
-├── archive/
-│   └── multi-cluster-attempt/  # Ancienne tentative multi-cluster
-└── README.md                 # Ce fichier
-```
-
-## Documentation détaillée
-
-Pour plus de détails sur le déploiement, consultez:
-- [Documentation complète](single-cluster/README.md)
-
-## Références
-
-- [OpenShift Service Mesh 3 Documentation](https://docs.redhat.com/en/documentation/red_hat_openshift_service_mesh/3.1/)
-- [Istio Ambient Mesh](https://istio.io/latest/docs/ambient/)
-- [Bookinfo Application](https://istio.io/latest/docs/examples/bookinfo/)
-- [Gateway API](https://gateway-api.sigs.k8s.io/)
